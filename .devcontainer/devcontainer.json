@@ -6,7 +6,7 @@
     "remoteUser": "ros",
     "initializeCommand": "bash -c 'touch ${HOME}/.Xauthority 2>/dev/null || true; if [ ! -z \"$DISPLAY\" ] && command -v xauth >/dev/null 2>&1; then xauth nlist $DISPLAY | sed -e \"s/^..../ffff/\" | xauth -f ${HOME}/.Xauthority nmerge -; fi'",
     "postCreateCommand": "sudo chmod 666 /tmp/.X11-unix/X0 2>/dev/null || true",
-    "postAttachCommand": "",
+    "postAttachCommand": "for device in /dev/ttyUSB* /dev/ttyACM*; do if [ -e \"$device\" ]; then sudo chmod 666 \"$device\" 2>/dev/null || echo \"Failed to set permissions for $device\";  ls -la \"$device\"; fi; done",
     "updateContentCommand": "",
     "workspaceFolder": "/home/ros/ros_ws",
     "mounts": [

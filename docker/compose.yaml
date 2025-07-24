@@ -42,15 +42,20 @@ services:
         target: /run/user/1000
     privileged: true
     network_mode: host
-    devices:
-      - /dev/ttyUSB0:/dev/ttyUSB0
-      - /dev/ttyUSB1:/dev/ttyUSB1
+    # Mount all devices via /dev volume above instead of specific devices
+    # This ensures all USB devices are available regardless of enumeration order
+    device_cgroup_rules:
+      - 'c 188:* rmw'  # Allow access to USB serial devices (ttyUSB*)
+      - 'c 166:* rmw'  # Allow access to ACM devices (ttyACM*)
     runtime: nvidia
     ipc: host
     tty: true
+    stdin_open: true
     cap_add:
       - SYS_PTRACE
+      - SYS_ADMIN  # Additional capability for device access
     group_add:
+      - dialout    # Essential group for serial device access
       - tty
       - audio
     security_opt:
