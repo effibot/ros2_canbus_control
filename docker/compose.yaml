@@ -21,6 +21,11 @@ services:
       - type: bind
         source: /tmp/.X11-unix
         target: /tmp/.X11-unix
+        read_only: false
+      - type: bind
+        source: ${HOME}/.Xauthority
+        target: /tmp/.host_xauth
+        read_only: true
       # uncomment the following line if you want to use the WSLg GUI
       # - type: bind
       #   source: /mnt/wslg
@@ -37,7 +42,10 @@ services:
         target: /run/user/1000
     privileged: true
     network_mode: host
-    # runtime: nvidia
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+      - /dev/ttyUSB1:/dev/ttyUSB1
+    runtime: nvidia
     ipc: host
     tty: true
     cap_add:
@@ -51,13 +59,15 @@ services:
     environment:
       - ROS_DOMAIN_ID=1
       - DISPLAY=${DISPLAY}
+      - XAUTHORITY=/home/ros/.Xauthority
       - NVIDIA_DRIVER_CAPABILITIES=all
       - NVIDIA_VISIBLE_DEVICES=all
       - QT_X11_NO_MITSHM=1
       - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}
-      #- PULSE_SERVER=${PULSE_SERVER}
+      - PULSE_SERVER=unix:${XDG_RUNTIME_DIR}/pulse/native
       - WAYLAND_DISPLAY=${WAYLAND_DISPLAY}
       - RCUTILS_COLORIZED_OUTPUT=1
       - TERM=xterm-256color
-    # Overrides default entrypoint so things don't shut down after the process ends.
-    command: sleep infinity
+      - LIBGL_ALWAYS_INDIRECT=0
+      - __GLX_VENDOR_LIBRARY_NAME=nvidia
+    command: bash -c "cp /tmp/.host_xauth /home/ros/.Xauthority 2>/dev/null || true; chmod 600 /home/ros/.Xauthority 2>/dev/null || true; sleep infinity"

@@ -57,6 +57,7 @@ RUN apt update && apt install -y \
     tmux \
     tzdata \
     unzip \
+    usbutils \
     vim \
     wget \
     xterm \
