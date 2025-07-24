@@ -28,7 +28,6 @@ BASE="full"
 
 
 # Get all arguments that are not flags (DOCKER_RUN_ARGS), that are in the form of --parameter-name
-I=0
 for arg in "$@"; do
     if [[ $arg == --* ]]; then
         DOCKER_RUN_ARGS="${DOCKER_RUN_ARGS} ${arg}"

@@ -2,8 +2,6 @@
 # shellcheck disable=SC1090,SC2086,SC1091
 # Helper script to build ROS 2 workspace and install dependencies in the container
 
-source "/opt/ros/$ROS_DISTRO/setup.bash" --
-
 if [ -e ${HOME}/ros2_ws/ ]; then
     pushd ${HOME}/ros2_ws || exit
         echo "Building ROS 2 workspace..."
