@@ -15,12 +15,12 @@ ARG USER_GID=$USER_UID
 RUN if id -u ${USER_UID} ; then userdel $(id -unr ${USER_UID}); fi
 
 RUN groupadd --gid $USER_GID $USERNAME \
-  && useradd -m \
-  -s /bin/bash \
-  -G sudo,plugdev,dialout \
-  --uid $USER_UID \
-  --gid $USER_GID \
-  $USERNAME
+    && useradd -m \
+    -s /bin/bash \
+    -G sudo,plugdev,dialout \
+    --uid $USER_UID \
+    --gid $USER_GID \
+    $USERNAME
 
 RUN apt update && apt full-upgrade -y \
     && apt install -y sudo \
@@ -90,8 +90,7 @@ ENV PATH="${HOME}/.cargo/bin:${PATH}"
 RUN ${HOME}/.cargo/bin/cargo install eza
 
 # Install individual terminal enhancement tools (split for better error detection)
-COPY scripts/install_*.sh /tmp/scripts/
-RUN sudo chmod +x /tmp/scripts/*.sh
+COPY --chmod=755 scripts/install_*.sh /tmp/scripts/
 
 # Install fzf
 RUN /tmp/scripts/install_fzf.sh
@@ -106,8 +105,7 @@ RUN /tmp/scripts/install_starship.sh
 RUN /tmp/scripts/install_ble.sh
 
 # Configure integrations between tools and remove installation scripts
-RUN /tmp/scripts/install_integration_conf.sh && \
-    sudo rm -rf /tmp/scripts
+RUN /tmp/scripts/install_integration_conf.sh
 
 # Source ros2 setup script in .bashrc
 # This ensures that the ROS 2 environment is sourced automatically when a new terminal is opened.
@@ -115,20 +113,27 @@ RUN echo "if [ -f ${WORKSPACE}/install/setup.bash ]; then source ${WORKSPACE}/in
 
 WORKDIR $WORKSPACE
 
-# Clean up
-RUN sudo apt autoremove -y \
-    && sudo apt clean \
-    && sudo rm -rf /var/lib/apt/lists/*
+# Switch back to root to clean up and remove scripts
+USER root
+RUN rm -rf /tmp/scripts && \
+    apt autoremove -y && \
+    apt clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Switch back to the non-root user
+USER ${USERNAME}
 
 ENV DEBIAN_FRONTEND=
 
 FROM base AS full
 
+# Switch back to root for package installations
+USER root
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=jazzy
 
 # Install core ROS 2 packages (non-simulation)
-RUN sudo apt update && sudo apt install -y \
+RUN apt update && apt install -y \
     ros-${ROS_DISTRO}-plotjuggler-ros \
     ros-${ROS_DISTRO}-rqt* \
     ros-${ROS_DISTRO}-ament-* \
@@ -137,37 +142,48 @@ RUN sudo apt update && sudo apt install -y \
     ros-${ROS_DISTRO}-canopen* \
     ros-${ROS_DISTRO}-navigation2 \
     ros-${ROS_DISTRO}-nav2-bringup \
-    && sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
+# Switch back to user for pip install
+USER ${USERNAME}
 # Install Python dependencies
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir -r /tmp/requirements.txt || true
 
-# Clean up
-RUN sudo apt autoremove -y \
-    && sudo apt clean \
-    && sudo rm -rf /var/lib/apt/lists/*
+# Switch back to root for final cleanup
+USER root
+RUN apt autoremove -y \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Switch back to user
+USER ${USERNAME}
 
 ENV DEBIAN_FRONTEND=
 
 FROM full AS sim
 
+# Switch back to root for package installations
+USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install Gazebo
-COPY scripts/install_gazebo.sh /tmp/install_gazebo.sh
-RUN sudo chmod +x /tmp/install_gazebo.sh && sudo /tmp/install_gazebo.sh ${ROS_DISTRO} && sudo rm /tmp/install_gazebo.sh
+COPY --chmod=755 scripts/install_gazebo.sh /tmp/install_gazebo.sh
+RUN /tmp/install_gazebo.sh ${ROS_DISTRO} && rm /tmp/install_gazebo.sh
 
 # Install simulation-specific ROS 2 packages
-RUN sudo apt update && sudo apt install -y \
+RUN apt update && apt install -y \
     ros-${ROS_DISTRO}-ros-gz* \
-    && sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*
-    #ros-${ROS_DISTRO}-rtabmap-ros
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+#ros-${ROS_DISTRO}-rtabmap-ros
 
 # Clean up
-RUN sudo apt autoremove -y \
-    && sudo apt clean \
-    && sudo rm -rf /var/lib/apt/lists/*
+RUN apt autoremove -y \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Switch back to user
+USER ${USERNAME}
 
 ENV DEBIAN_FRONTEND=
 
