@@ -1,0 +1,95 @@
+{
+    "name": "ROS2 CAN Bus Control - NVIDIA GPU",
+    "dockerComposeFile": [
+        "compose.yaml"
+    ],
+    "service": "ros2_jazzy",
+    "workspaceFolder": "/home/ros/ros_ws",
+    "shutdownAction": "stopCompose",
+    // NVIDIA GPU specific settings
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.cpptools",
+                "ms-vscode.cpptools-extension-pack",
+                "ms-vscode.cmake-tools",
+                "twxs.cmake",
+                "ms-python.python",
+                "ms-python.flake8",
+                "ms-python.autopep8",
+                "charliermarsh.ruff",
+                "smilerobotics.urdf",
+                "redhat.vscode-xml",
+                "redhat.vscode-yaml",
+                "ms-vscode.makefile-tools",
+                "eamodio.gitlens",
+                "streetsidesoftware.code-spell-checker",
+                "betwo.b2-catkin-tools",
+                "Ranch-Hand-Robotics.rde-pack"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/bin/python3",
+                "python.linting.enabled": true,
+                "python.linting.pylintEnabled": false,
+                "python.linting.flake8Enabled": true,
+                "python.formatting.provider": "autopep8",
+                "C_Cpp.default.intelliSenseMode": "linux-gcc-x64",
+                "C_Cpp.default.compilerPath": "/usr/bin/gcc",
+                "C_Cpp.default.cStandard": "c11",
+                "C_Cpp.default.cppStandard": "c++17",
+                "files.associations": {
+                    "*.repos": "yaml",
+                    "*.world": "xml",
+                    "*.xacro": "xml",
+                    "*.urdf": "xml",
+                    "*.sdf": "xml"
+                },
+                "terminal.integrated.shell.linux": "/bin/bash",
+                "ros.distro": "jazzy"
+            }
+        }
+    },
+    // Features for NVIDIA GPU
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/nvidia-cuda:1": {
+            "installCudnn": true,
+            "installNvtop": true
+        }
+    },
+    // Environment variables optimized for NVIDIA GPU
+    "containerEnv": {
+        "DISPLAY": "${localEnv:DISPLAY}",
+        "WAYLAND_DISPLAY": "${localEnv:WAYLAND_DISPLAY}",
+        "XDG_RUNTIME_DIR": "${localEnv:XDG_RUNTIME_DIR}",
+        "XDG_SESSION_TYPE": "${localEnv:XDG_SESSION_TYPE}",
+        "PULSE_RUNTIME_PATH": "${localEnv:PULSE_RUNTIME_PATH}",
+        "PULSE_SERVER": "${localEnv:PULSE_SERVER}",
+        "QT_QPA_PLATFORM": "xcb",
+        "ROS_DOMAIN_ID": "42",
+        "ROS_AUTOMATIC_DISCOVERY_RANGE": "LOCALHOST",
+        // NVIDIA specific
+        "NVIDIA_VISIBLE_DEVICES": "all",
+        "NVIDIA_DRIVER_CAPABILITIES": "all",
+        "__GLX_VENDOR_LIBRARY_NAME": "nvidia",
+        "__NV_PRIME_RENDER_OFFLOAD": "1",
+        "__NV_PRIME_RENDER_OFFLOAD_PROVIDER": "NVIDIA-G0"
+    },
+    // Mounts for NVIDIA GPU and graphics
+    "mounts": [
+        "source=${localEnv:HOME}/.ssh,target=/home/ros/.ssh,type=bind,readonly",
+        "source=${localWorkspaceFolder}/config/aliases.sh,target=/home/ros/.bash_aliases,type=bind",
+        "source=${localWorkspaceFolder}/config/nanorc,target=/home/ros/.nanorc,type=bind",
+        "source=${localWorkspaceFolder}/config/vimrc,target=/home/ros/.vimrc,type=bind",
+        // Graphics support
+        "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind",
+        "source=/dev/dri,target=/dev/dri,type=bind",
+        "source=/run/user,target=/run/user,type=bind",
+        // Wayland support
+        "source=${localEnv:XDG_RUNTIME_DIR}/${localEnv:WAYLAND_DISPLAY},target=${localEnv:XDG_RUNTIME_DIR}/${localEnv:WAYLAND_DISPLAY},type=bind,consistency=cached"
+    ],
+    // Post create command
+    "postCreateCommand": "sudo chown -R ros:ros /home/ros/ros_ws && for device in /dev/ttyUSB* /dev/ttyACM*; do if [ -e \"$device\" ]; then sudo chmod 666 \"$device\" 2>/dev/null || echo \"Failed to set permissions for $device\"; ls -la \"$device\"; fi; done && echo 'source /opt/ros/jazzy/setup.bash' >> ~/.bashrc",
+    // Set the default user
+    "remoteUser": "ros"
+}

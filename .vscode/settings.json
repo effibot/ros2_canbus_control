@@ -1,0 +1,62 @@
+{
+    // VSCode workspace settings for ROS2 CAN Bus Control
+    // This file is automatically applied when opening the workspace
+    "files.associations": {
+        "*.repos": "yaml",
+        "*.world": "xml",
+        "*.xacro": "xml",
+        "*.urdf": "xml",
+        "*.sdf": "xml",
+        "*.launch": "xml",
+        "*.launch.py": "python"
+    },
+    // Python settings for ROS2 development
+    "python.defaultInterpreterPath": "/usr/bin/python3",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": true,
+    "python.formatting.provider": "autopep8",
+    // C++ settings for ROS2 development
+    "C_Cpp.default.intelliSenseMode": "linux-gcc-x64",
+    "C_Cpp.default.compilerPath": "/usr/bin/gcc",
+    "C_Cpp.default.cStandard": "c11",
+    "C_Cpp.default.cppStandard": "c++17",
+    "C_Cpp.default.includePath": [
+        "/opt/ros/jazzy/include/**",
+        "/usr/include/**"
+    ],
+    // Terminal settings
+    "terminal.integrated.shell.linux": "/bin/bash",
+    "terminal.integrated.env.linux": {
+        "ROS_DOMAIN_ID": "42"
+    },
+    // Git settings
+    "git.autofetch": true,
+    "git.confirmSync": false,
+    // Editor settings
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": "explicit"
+    },
+    // Search settings
+    "search.exclude": {
+        "**/build": true,
+        "**/install": true,
+        "**/log": true,
+        "**/.git": true,
+        "**/node_modules": true
+    },
+    // File watcher settings
+    "files.watcherExclude": {
+        "**/build/**": true,
+        "**/install/**": true,
+        "**/log/**": true
+    },
+    "ROS2.distro": "jazzy",
+    "python.autoComplete.extraPaths": [
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/opt/ros/jazzy/lib/python3.12/site-packages"
+    ]
+}

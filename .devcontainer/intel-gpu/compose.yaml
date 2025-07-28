@@ -1,0 +1,68 @@
+services:
+  ros2_jazzy:
+    build:
+      context: ../../
+      dockerfile: docker/Dockerfile
+      tags:
+        - ros2-canbus-intel:latest
+      target: app
+      args:
+        - BASE_DOCKER_IMAGE=osrf/ros:jazzy-desktop-full
+        - WORKSPACE=/home/ros/ros_ws
+        - network=host
+    container_name: ros2_jazzy_intel
+    volumes:
+      - type: bind
+        source: /dev
+        target: /dev
+      - type: bind
+        source: ../../
+        target: /home/ros/ros_ws
+      # X11 forwarding for Xorg
+      - type: bind
+        source: /tmp/.X11-unix
+        target: /tmp/.X11-unix
+        read_only: false
+      - type: bind
+        source: ${HOME}/.Xauthority
+        target: /tmp/.host_xauth
+        read_only: true
+      # Intel GPU support
+      - type: bind
+        source: /dev/dri
+        target: /dev/dri
+      # Wayland support
+      - type: bind
+        source: /run/user
+        target: /run/user
+      # PulseAudio support
+      - type: bind
+        source: /run/user
+        target: /run/user
+    privileged: true
+    network_mode: host
+    # Device access for USB devices
+    device_cgroup_rules:
+      - 'c 188:* rmw'  # Allow access to USB serial devices (ttyUSB*)
+      - 'c 166:* rmw'  # Allow access to ACM devices (ttyACM*)
+    # Intel GPU and graphics devices
+    devices:
+      - "/dev/dri:/dev/dri"
+    environment:
+      # Display environment variables
+      - DISPLAY=${DISPLAY}
+      - WAYLAND_DISPLAY=${WAYLAND_DISPLAY}
+      - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}
+      - XDG_SESSION_TYPE=${XDG_SESSION_TYPE}
+      - PULSE_SERVER=${PULSE_SERVER}
+      - QT_QPA_PLATFORM=xcb
+      # Intel GPU specific
+      - LIBVA_DRIVER_NAME=iHD
+      - INTEL_MEDIA_RUNTIME=ONEVPL
+      - GST_VAAPI_ALL_DRIVERS=1
+      - LIBGL_ALWAYS_SOFTWARE=0
+      # ROS specific
+      - ROS_DOMAIN_ID=42
+      - ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+    # Command to keep container running for dev containers
+    command: sleep infinity
