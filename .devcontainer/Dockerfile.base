@@ -1,5 +1,5 @@
 ARG ROS_DISTRO=jazzy
-FROM osrf/ros:${ROS_DISTRO}-desktop-full
+FROM osrf/ros:${ROS_DISTRO}-desktop-full AS base
 
 ARG USERNAME=ros_user
 ARG USER_UID=1000
@@ -24,17 +24,22 @@ RUN apt-get update && apt-get upgrade -yq && \
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl git sudo lsb-release locales bash-completion tzdata gosu \
-    tmux xterm less bc build-essential htop psmisc neovim pip \
-    python3-rosdep python3-vcstool python3-argcomplete python3-colcon-common-extensions \
-    ros-dev-tools --no-install-recommends && \
+    tmux xterm less bc build-essential btop psmisc neovim pip bat \
+    python3-rosdep python3-vcstool python3-argcomplete python3-colcon-* \
+    unzip zip wget gnupg2 software-properties-common \
+    ros-dev-tools bash-completion gawk && \
     rm -rf /var/lib/apt/lists/*
+# Install nano syntax highlighting
+RUN curl https://raw.githubusercontent.com/scopatz/nanorc/master/install.sh | sh
+
+ENV EDITOR=nano
 
 # Add a user with no password, create home directory and add sudo support
 RUN groupadd --gid ${USER_GID} ${USERNAME} && \
         useradd --gid ${USER_GID} -m ${USERNAME} && \
         echo "${USERNAME}:${USERNAME}" | chpasswd && \
         usermod --shell /bin/bash ${USERNAME} && \
-        usermod -aG sudo ${USERNAME} && \
+        usermod -aG sudo,plugdev,dialout ${USERNAME} && \
         usermod  --uid ${USER_UID} ${USERNAME} && \
         echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/${USERNAME} && \
         chmod 0440 /etc/sudoers.d/${USERNAME}
@@ -47,7 +52,34 @@ RUN su ${USERNAME} -c "rosdep update"; \
     echo "source ${ROS_WORKSPACE}/install/setup.bash" >> /home/${USERNAME}/.bashrc && \
     echo 'if [ -z "${TMUX}" ] && [ "${TERM_PROGRAM}" != "vscode" ] && [ -z "${SESSION_MANAGER}" ]; then tmux attach -t default || tmux new -s default; fi' >> /home/${USERNAME}/.bashrc && \
     echo "set -g mouse on" >> /home/${USERNAME}/.tmux.conf && \
-    mkdir -p ${ROS_WORKSPACE}/src && chown -R ${USERNAME}:${USERNAME} ${ROS_WORKSPACE}
+    mkdir -p ${ROS_WORKSPACE}/src && chown -R ${USERNAME}:${USERNAME} ${ROS_WORKSPACE} \
+    && echo "if [ -f /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash ]; then source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash; fi" >> ${HOME}/.bashrc \
+    && echo "if [ -f /usr/share/colcon_cd/function/colcon_cd.sh ]; then source /usr/share/colcon_cd/function/colcon_cd.sh; export _colcon_cd_root=/opt/ros/${ROS_DISTRO}; fi" >> ${HOME}/.bashrc \
+    && sed -i 's/#force_color_prompt=yes/force_color_prompt=yes/' ${HOME}/.bashrc 
+
+# Install ble:sh, Set up zoxide for smarter cd and fzf for fuzzy search and lsd for ls
+RUN git clone --recursive --depth 1 --shallow-submodules https://github.com/akinomyoga/ble.sh.git ${HOME}/ble.sh.d \
+    && wget https://github.com/lsd-rs/lsd/releases/download/v1.1.5/lsd-musl_1.1.5_amd64.deb -O ${HOME}/lsd.deb \
+    && sudo dpkg -i ${HOME}/lsd.deb && rm ${HOME}/lsd.deb \
+    && make -j -C ${HOME}/ble.sh.d install PREFIX=${HOME}/.local \
+    && curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh \
+    && git clone --depth 1 https://github.com/junegunn/fzf.git ${HOME}/.fzf && ${HOME}/.fzf/install \
+    && curl -sS https://starship.rs/install.sh | sh -s -- -y -b ${HOME}/.local/bin
+
+RUN echo 'eval "$(fzf --bash)"' >> ${HOME}/.bashrc \
+    && sed -i '1isource ${HOME}/.local/share/blesh/ble.sh --noattach' ${HOME}/.bashrc \
+    && echo 'eval "$(zoxide init bash --cmd cd)"' >> ${HOME}/.bashrc \
+    && echo 'eval "$(starship init bash)"' >> ${HOME}/.bashrc \
+    && echo '[[ ${BLE_VERSION-} ]] && ble-attach' >> ${HOME}/.bashrc \
+    && mkdir -p ${HOME}/.config \
+    && touch ${HOME}/.config/starship.toml \
+    && touch ${HOME}/.blerc
+
+RUN echo 'eval "$(which starship) preset gruvbox-rainbow"' >> ${HOME}/.config/starship.toml \
+    && echo 'source /etc/profile.d/bash_completion.sh' >> ${HOME}/.blerc \
+    && echo 'ble-import -d integration/fzf-completion' >> ${HOME}/.blerc \
+    && echo 'ble-import -d integration/fzf-key-bindings' >> ${HOME}/.blerc \
+    && echo 'ble-import integration/zoxide' >> ${HOME}/.blerc
 
 COPY build_ws.sh /usr/local/bin/build_ws
 RUN chmod +x /usr/local/bin/build_ws

@@ -1,5 +1,5 @@
 ARG ROS_DISTRO=jazzy
-FROM ghcr.io/robotics-content-lab/${ROS_DISTRO}:base
+FROM canbus:latest AS base
 
 ARG USERNAME=ros_user
 ARG USER_UID=1000
