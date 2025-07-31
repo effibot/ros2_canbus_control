@@ -10,7 +10,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
     """Generate launch description with multiple components."""
-    path_file = os.path.dirname(__file__)
+    # path_file = os.path.dirname(__file__)
 
     package_name = 'microphase_can_config'
     bus_config_name = 'bus_config'
@@ -21,8 +21,9 @@ def generate_launch_description():
     device_container = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
-                os.path.join(get_package_share_directory(
-                    'canopen_core'), 'launch'),
+                os.path.join(
+                    get_package_share_directory('canopen_core'), 'launch'
+                ),
                 '/canopen.launch.py',
             ]
         ),
