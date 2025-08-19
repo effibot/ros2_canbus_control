@@ -6,7 +6,7 @@ SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Create a non-root user
+# Create a non-root user but stay as root for all installations
 ARG USERNAME=ros
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
@@ -22,13 +22,27 @@ RUN groupadd --gid $USER_GID $USERNAME \
     --gid $USER_GID \
     $USERNAME
 
+# Configure sudo properly
 RUN apt update && apt full-upgrade -y \
     && apt install -y sudo \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME \
     && rm -rf /var/lib/apt/lists/*
 
-# Basic tools
+# Create sudo protection script for use at each stage
+RUN echo '#!/bin/bash' > /usr/local/bin/fix-sudo.sh \
+    && echo 'chown root:root /usr/bin/sudo 2>/dev/null || true' >> /usr/local/bin/fix-sudo.sh \
+    && echo 'chmod 4755 /usr/bin/sudo 2>/dev/null || true' >> /usr/local/bin/fix-sudo.sh \
+    && echo 'chown root:root /etc/sudo.conf 2>/dev/null || true' >> /usr/local/bin/fix-sudo.sh \
+    && echo 'chmod 644 /etc/sudo.conf 2>/dev/null || true' >> /usr/local/bin/fix-sudo.sh \
+    && echo 'chown root:root /etc/sudoers 2>/dev/null || true' >> /usr/local/bin/fix-sudo.sh \
+    && echo 'chmod 440 /etc/sudoers 2>/dev/null || true' >> /usr/local/bin/fix-sudo.sh \
+    && echo 'chown root:root /etc/sudoers.d/* 2>/dev/null || true' >> /usr/local/bin/fix-sudo.sh \
+    && echo 'chmod 440 /etc/sudoers.d/* 2>/dev/null || true' >> /usr/local/bin/fix-sudo.sh \
+    && chmod +x /usr/local/bin/fix-sudo.sh \
+    && /usr/local/bin/fix-sudo.sh
+
+# Basic tools installation (staying as root)
 RUN apt update && apt install -y \
     apt-utils \
     bash-completion \
@@ -62,8 +76,7 @@ RUN apt update && apt install -y \
     wget \
     xterm \
     zsh \
-    && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Configure Git to accept different ownerships for local repository clones
 RUN git config --system --add safe.directory '*'
@@ -73,62 +86,62 @@ RUN curl https://raw.githubusercontent.com/scopatz/nanorc/master/install.sh | sh
 
 ENV EDITOR=nano
 
-USER ${USERNAME}
+# Set up user environment variables (but stay as root)
 ENV HOME=/home/${USERNAME}
 ENV USER=${USERNAME}
-ENV PATH=${HOME}/.local/bin:${PATH}
+ENV PATH=/home/${USERNAME}/.local/bin:${PATH}
 
 # Set up the workspace
-ARG WORKSPACE=${HOME}/ros_ws
+ARG WORKSPACE=/home/${USERNAME}/ros_ws
 ENV WORKSPACE=$WORKSPACE
 
-# Install Rust for the user
+# Install Rust for the user (as root but in user's home)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="${HOME}/.cargo/bin:${PATH}"
+ENV PATH="/home/${USERNAME}/.cargo/bin:${PATH}"
 
-# Install eza via cargo
-RUN ${HOME}/.cargo/bin/cargo install eza
+# Fix ownership of .cargo directory
+RUN chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/.cargo
 
-# Install individual terminal enhancement tools (split for better error detection)
+# Install eza via cargo (as root but install to user's cargo)
+RUN runuser -l ${USERNAME} -c '/home/ros/.cargo/bin/cargo install eza'
+
+# Install terminal enhancement tools (staying as root)
 COPY --chmod=755 scripts/install_*.sh /tmp/scripts/
 
-# Install fzf
-RUN /tmp/scripts/install_fzf.sh
+# Install fzf for the user
+RUN runuser -l ${USERNAME} -c '/tmp/scripts/install_fzf.sh'
 
-# Install zoxide
-RUN /tmp/scripts/install_zoxide.sh
+# Install zoxide for the user  
+RUN runuser -l ${USERNAME} -c '/tmp/scripts/install_zoxide.sh'
 
-# Install starship
-RUN /tmp/scripts/install_starship.sh
+# Install starship for the user
+RUN runuser -l ${USERNAME} -c '/tmp/scripts/install_starship.sh'
 
-# Install ble.sh
-RUN /tmp/scripts/install_ble.sh
+# Install ble.sh for the user
+RUN runuser -l ${USERNAME} -c '/tmp/scripts/install_ble.sh'
 
-# Configure integrations between tools and remove installation scripts
-RUN /tmp/scripts/install_integration_conf.sh
+# Configure integrations
+RUN runuser -l ${USERNAME} -c '/tmp/scripts/install_integration_conf.sh'
 
-# Source ros2 setup script in .bashrc
-# This ensures that the ROS 2 environment is sourced automatically when a new terminal is opened.
-RUN echo "if [ -f ${WORKSPACE}/install/setup.bash ]; then source ${WORKSPACE}/install/setup.bash; fi" >> ${HOME}/.bashrc
+# Source ros2 setup script in .bashrc for the user
+RUN echo "if [ -f ${WORKSPACE}/install/setup.bash ]; then source ${WORKSPACE}/install/setup.bash; fi" >> /home/${USERNAME}/.bashrc
 
-WORKDIR $WORKSPACE
+# Clean up installation scripts
+RUN rm -rf /tmp/scripts
 
-# Switch back to root to clean up and remove scripts
-USER root
-RUN rm -rf /tmp/scripts && \
-    apt autoremove -y && \
-    apt clean && \
-    rm -rf /var/lib/apt/lists/*
+# Clean up apt cache
+RUN apt autoremove -y \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# Switch back to the non-root user
-USER ${USERNAME}
+# Set workspace directory ownership
+RUN mkdir -p ${WORKSPACE} && chown -R ${USERNAME}:${USERNAME} ${WORKSPACE}
 
 ENV DEBIAN_FRONTEND=
 
 FROM base AS full
 
-# Switch back to root for package installations
-USER root
+# Stay as root for package installations
 ENV DEBIAN_FRONTEND=noninteractive
 ENV ROS_DISTRO=jazzy
 
@@ -144,27 +157,21 @@ RUN apt update && apt install -y \
     ros-${ROS_DISTRO}-nav2-bringup \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Switch back to user for pip install
-USER ${USERNAME}
-# Install Python dependencies
+# Install Python dependencies for the user
 COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt || true
+RUN runuser -l ${USERNAME} -c 'pip install --no-cache-dir -r /tmp/requirements.txt' || true
+RUN rm /tmp/requirements.txt
 
-# Switch back to root for final cleanup
-USER root
+# Final cleanup
 RUN apt autoremove -y \
     && apt clean \
     && rm -rf /var/lib/apt/lists/*
-
-# Switch back to user
-USER ${USERNAME}
 
 ENV DEBIAN_FRONTEND=
 
 FROM full AS sim
 
-# Switch back to root for package installations
-USER root
+# Stay as root for package installations
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install Gazebo
@@ -177,16 +184,21 @@ RUN apt update && apt install -y \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 #ros-${ROS_DISTRO}-rtabmap-ros
 
-# Clean up
+# Final cleanup
 RUN apt autoremove -y \
     && apt clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Switch back to user
-USER ${USERNAME}
-
 ENV DEBIAN_FRONTEND=
 
 FROM sim AS app
+
+# Set working directory and switch to user ONLY at the very end
+WORKDIR ${WORKSPACE}
+
+# Fix sudo configuration before switching to non-root user
+RUN /usr/local/bin/fix-sudo.sh
+
+USER ${USERNAME}
 
 ENV DEBIAN_FRONTEND=

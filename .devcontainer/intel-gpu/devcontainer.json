@@ -24,7 +24,9 @@
                 "eamodio.gitlens",
                 "streetsidesoftware.code-spell-checker",
                 "betwo.b2-catkin-tools",
-                "Ranch-Hand-Robotics.rde-pack"
+                "Ranch-Hand-Robotics.rde-pack",
+                "KevinRose.vsc-python-indent",
+                "mgesbert.python-path"
             ],
             "settings": {
                 "python.defaultInterpreterPath": "/usr/bin/python3",

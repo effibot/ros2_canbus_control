@@ -24,7 +24,9 @@
                 "eamodio.gitlens",
                 "streetsidesoftware.code-spell-checker",
                 "betwo.b2-catkin-tools",
-                "Ranch-Hand-Robotics.rde-pack"
+                "Ranch-Hand-Robotics.rde-pack",
+                "KevinRose.vsc-python-indent",
+                "mgesbert.python-path"
             ],
             "settings": {
                 "python.defaultInterpreterPath": "/usr/bin/python3",
@@ -87,8 +89,9 @@
         // Wayland support
         "source=${localEnv:XDG_RUNTIME_DIR}/${localEnv:WAYLAND_DISPLAY},target=${localEnv:XDG_RUNTIME_DIR}/${localEnv:WAYLAND_DISPLAY},type=bind,consistency=cached"
     ],
-    // Post create command
-    "postCreateCommand": "sudo chown -R ros:ros /home/ros/ros_ws && for device in /dev/ttyUSB* /dev/ttyACM*; do if [ -e \"$device\" ]; then sudo chmod 666 \"$device\" 2>/dev/null || echo \"Failed to set permissions for $device\"; ls -la \"$device\"; fi; done && echo 'source /opt/ros/jazzy/setup.bash' >> ~/.bashrc",
+    // Post create command - removed sudo commands due to broken sudo in container
+    // All setup is now handled in compose.yaml command
+    // "postCreateCommand": "",
     // Set the default user
     "remoteUser": "ros"
 }

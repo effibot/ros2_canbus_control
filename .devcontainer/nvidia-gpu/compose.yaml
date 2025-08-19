@@ -23,18 +23,18 @@ services:
         source: /tmp/.X11-unix
         target: /tmp/.X11-unix
         read_only: false
-      - type: bind
-        source: ${HOME}/.Xauthority
-        target: /tmp/.host_xauth
-        read_only: true
-      # Intel GPU support (for hybrid systems)
-      - type: bind
-        source: /dev/dri
-        target: /dev/dri
       # Wayland support
+      - type: bind
+        source: ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}
+        target: ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}
+        read_only: false
       - type: bind
         source: /run/user
         target: /run/user
+      # Intel GPU support (for hybrid systems)  
+      - type: bind
+        source: /dev/dri
+        target: /dev/dri
       # PulseAudio support
       - type: bind
         source: /run/user
@@ -49,6 +49,8 @@ services:
     runtime: nvidia
     devices:
       - "/dev/dri:/dev/dri"
+      - "/dev/ttyUSB0:/dev/ttyUSB0"
+      - "/dev/ttyUSB1:/dev/ttyUSB1"
     environment:
       # Display environment variables
       - DISPLAY=${DISPLAY}
@@ -56,7 +58,9 @@ services:
       - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}
       - XDG_SESSION_TYPE=${XDG_SESSION_TYPE}
       - PULSE_SERVER=${PULSE_SERVER}
-      - QT_QPA_PLATFORM=xcb
+      - QT_QPA_PLATFORM=wayland
+      - GDK_BACKEND=wayland
+      - MOZ_ENABLE_WAYLAND=1
       # NVIDIA specific
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
