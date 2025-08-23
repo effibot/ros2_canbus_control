@@ -7,6 +7,9 @@ set -euo pipefail
 
 echo "Installing ble.sh..."
 
+# Set ZDOTDIR if not already set (adapts to ZSH configuration)
+export ZDOTDIR="${ZDOTDIR:-${HOME}/.config/zsh}"
+
 # Clone and install ble.sh
 git clone --recursive --depth 1 --shallow-submodules https://github.com/akinomyoga/ble.sh.git "${HOME}"/ble.sh.d
 make -j -C "${HOME}"/ble.sh.d install PREFIX="${HOME}"/.local

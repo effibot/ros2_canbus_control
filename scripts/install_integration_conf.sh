@@ -8,6 +8,9 @@ set -euo pipefail
 
 echo "Configuring terminal tool integrations..."
 
+# Set ZDOTDIR if not already set (adapts to ZSH configuration)
+export ZDOTDIR="${ZDOTDIR:-${HOME}/.config/zsh}"
+
 # Configure GPG for container environment
 echo "Configuring GPG for container environment..."
 mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
@@ -25,6 +28,18 @@ sed -i 's/#force_color_prompt=yes/force_color_prompt=yes/' "${HOME}"/.bashrc
     echo "if [ -f /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash ]; then source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash; fi"
     echo "if [ -f /usr/share/colcon_cd/function/colcon_cd.sh ]; then source /usr/share/colcon_cd/function/colcon_cd.sh; export _colcon_cd_root=/opt/ros/\${ROS_DISTRO}; fi"
 } >> "${HOME}"/.bashrc
+
+# Configure ZSH with similar integrations
+echo "Configuring ZSH integrations..."
+mkdir -p "${ZDOTDIR}"
+
+{
+    echo "export GPG_TTY=\$(tty)"
+    echo "source /opt/ros/\${ROS_DISTRO:-}/setup.zsh"
+    echo "if [ -z \"\${TMUX:-}\" ] && [ \"\${TERM_PROGRAM:-}\" != \"vscode\" ] && [ -z \"\${SESSION_MANAGER:-}\" ]; then tmux attach -t default || tmux new -s default; fi"
+    echo "if [ -f /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash ]; then source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash; fi"
+    echo "if [ -f /usr/share/colcon_cd/function/colcon_cd.sh ]; then source /usr/share/colcon_cd/function/colcon_cd.sh; export _colcon_cd_root=/opt/ros/\${ROS_DISTRO}; fi"
+} >> "${ZDOTDIR}/.zshrc"
 
 # Configure ble.sh integrations
 echo "Configuring ble.sh integrations..."

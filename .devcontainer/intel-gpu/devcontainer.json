@@ -4,9 +4,11 @@
         "compose.yaml"
     ],
     "service": "ros2_jazzy",
-    "workspaceFolder": "/home/ros/ros_ws",
+    "workspaceFolder": "/home/ubuntu/ros_ws",
     "shutdownAction": "stopCompose",
-    // Intel GPU specific settings
+    "hostRequirements": {
+        "gpu": "optional"
+    },
     "customizations": {
         "vscode": {
             "extensions": [
@@ -50,41 +52,13 @@
             }
         }
     },
-    // Features for Intel GPU
-    "features": {
-        "ghcr.io/devcontainers/features/git:1": {}
-    },
-    // Environment variables optimized for Intel GPU
-    "containerEnv": {
-        "DISPLAY": "${localEnv:DISPLAY}",
-        "WAYLAND_DISPLAY": "${localEnv:WAYLAND_DISPLAY}",
-        "XDG_RUNTIME_DIR": "${localEnv:XDG_RUNTIME_DIR}",
-        "XDG_SESSION_TYPE": "${localEnv:XDG_SESSION_TYPE}",
-        "PULSE_RUNTIME_PATH": "${localEnv:PULSE_RUNTIME_PATH}",
-        "PULSE_SERVER": "${localEnv:PULSE_SERVER}",
-        "QT_QPA_PLATFORM": "xcb",
-        "ROS_DOMAIN_ID": "42",
-        "ROS_AUTOMATIC_DISCOVERY_RANGE": "LOCALHOST",
-        // Intel GPU specific
-        "LIBVA_DRIVER_NAME": "iHD",
-        "INTEL_MEDIA_RUNTIME": "ONEVPL",
-        "GST_VAAPI_ALL_DRIVERS": "1"
-    },
     // Mounts for Intel GPU and graphics
     "mounts": [
         "source=${localEnv:HOME}/.ssh,target=/home/ros/.ssh,type=bind,readonly",
         "source=${localWorkspaceFolder}/config/aliases.sh,target=/home/ros/.bash_aliases,type=bind",
         "source=${localWorkspaceFolder}/config/nanorc,target=/home/ros/.nanorc,type=bind",
         "source=${localWorkspaceFolder}/config/vimrc,target=/home/ros/.vimrc,type=bind",
-        // Graphics and Intel GPU support
-        "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind",
-        "source=/dev/dri,target=/dev/dri,type=bind",
-        "source=/run/user,target=/run/user,type=bind",
-        // Wayland support
-        "source=${localEnv:XDG_RUNTIME_DIR}/${localEnv:WAYLAND_DISPLAY},target=${localEnv:XDG_RUNTIME_DIR}/${localEnv:WAYLAND_DISPLAY},type=bind,consistency=cached"
     ],
-    // Post create command
-    "postCreateCommand": "sudo chown -R ros:ros /home/ros/ros_ws && for device in /dev/ttyUSB* /dev/ttyACM*; do if [ -e \"$device\" ]; then sudo chmod 666 \"$device\" 2>/dev/null || echo \"Failed to set permissions for $device\"; ls -la \"$device\"; fi; done && echo 'source /opt/ros/jazzy/setup.bash' >> ~/.bashrc",
     // Set the default user
-    "remoteUser": "ros"
+    "remoteUser": "ubuntu"
 }

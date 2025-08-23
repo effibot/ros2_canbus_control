@@ -8,37 +8,35 @@ services:
       target: app
       args:
         - BASE_DOCKER_IMAGE=osrf/ros:jazzy-desktop-full
-        - WORKSPACE=/home/ros/ros_ws
+        - WORKSPACE=/home/ubuntu/ros_ws
         - network=host
     container_name: ros2_jazzy_nvidia
     volumes:
+      # Mount /dev for device access
       - type: bind
         source: /dev
         target: /dev
       - type: bind
         source: ../../
-        target: /home/ros/ros_ws
+        target: /home/ubuntu/ros_ws
       # X11 forwarding for Xorg
       - type: bind
         source: /tmp/.X11-unix
         target: /tmp/.X11-unix
-        read_only: false
+        consistency: cached
       # Wayland support
       - type: bind
         source: ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}
         target: ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}
+        consistency: cached
         read_only: false
       - type: bind
         source: /run/user
         target: /run/user
-      # Intel GPU support (for hybrid systems)  
+      # Intel GPU support (for hybrid systems)
       - type: bind
         source: /dev/dri
         target: /dev/dri
-      # PulseAudio support
-      - type: bind
-        source: /run/user
-        target: /run/user
     privileged: true
     network_mode: host
     # Device access for USB devices
@@ -47,20 +45,31 @@ services:
       - 'c 166:* rmw'  # Allow access to ACM devices (ttyACM*)
     # NVIDIA GPU support
     runtime: nvidia
+    ipc: host
+    tty: true
+    cap_add:
+      - SYS_PTRACE
+    group_add:
+      - tty
+      - audio
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
     devices:
-      - "/dev/dri:/dev/dri"
       - "/dev/ttyUSB0:/dev/ttyUSB0"
       - "/dev/ttyUSB1:/dev/ttyUSB1"
     environment:
+      - "TERM=xterm-256color"
       # Display environment variables
       - DISPLAY=${DISPLAY}
       - WAYLAND_DISPLAY=${WAYLAND_DISPLAY}
       - XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR}
       - XDG_SESSION_TYPE=${XDG_SESSION_TYPE}
-      - PULSE_SERVER=${PULSE_SERVER}
-      - QT_QPA_PLATFORM=wayland
+      - XAUTHORITY=$XAUTHORITY
+      - QT_QPA_PLATFORM=xcb
       - GDK_BACKEND=wayland
       - MOZ_ENABLE_WAYLAND=1
+      - QT_X11_NO_MITSHM=1
       # NVIDIA specific
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all

@@ -60,5 +60,6 @@
         "/opt/ros/jazzy/lib/python3.12/site-packages"
     ],
     "python.analysis.autoImportCompletions": true,
-    "cmake.ignoreCMakeListsMissing": true
+    "cmake.ignoreCMakeListsMissing": true,
+    "github.copilot.chat.codeGeneration.useInstructionFiles": true
 }
