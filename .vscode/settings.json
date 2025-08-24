@@ -61,5 +61,10 @@
     ],
     "python.analysis.autoImportCompletions": true,
     "cmake.ignoreCMakeListsMissing": true,
-    "github.copilot.chat.codeGeneration.useInstructionFiles": true
+    "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+    "cSpell.words": [
+        "Efficace",
+        "rclcpp",
+        "Waveshare"
+    ]
 }

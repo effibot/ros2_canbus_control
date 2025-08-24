@@ -1,3 +1,9 @@
+#!/usr/bin/env python3
+
+"""Launch file for simple CAN communication test."""
+
+import os
+
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
@@ -46,6 +52,10 @@ def generate_launch_description():
         }],
         output='screen'
     )
+
+    # assert that the permissions are set correctly on the devices
+    # os.system('sudo chmod 666 ' + LaunchConfiguration('usb0_device').perform({}))
+    # os.system('sudo chmod 666 ' + LaunchConfiguration('usb1_device').perform({}))
 
     return LaunchDescription([
         usb0_device_arg,

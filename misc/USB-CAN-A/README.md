@@ -43,5 +43,5 @@ Options:
 $ ./canusb -t -d /dev/ttyUSB0 -s 1000000 -t
 
 # send the bytes 0xBEEE from ID 005 on at 1 Mbit CAN bus
-$ ./canusb -d /dev/ttyUSB0 -s 1000000 -t -i 5 -j BEEE
+$ ./canusb -d /dev/ttyUSB1 -s 1000000 -t -i 5 -j BEEE
 ```

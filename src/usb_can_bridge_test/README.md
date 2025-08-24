@@ -60,7 +60,7 @@ ls -la /dev/ttyUSB*
 
 ```bash
 sudo chmod 666 /dev/ttyUSB0 /dev/ttyUSB1
-# or add user to dialout group:
+# or add user to dialout or uucp (on Arch) group:
 sudo usermod -a -G dialout $USER
 # (requires logout/login)
 ```
