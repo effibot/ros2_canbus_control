@@ -54,10 +54,10 @@
     },
     // Mounts for Intel GPU and graphics
     "mounts": [
-        "source=${localEnv:HOME}/.ssh,target=/home/ros/.ssh,type=bind,readonly",
-        "source=${localWorkspaceFolder}/config/aliases.sh,target=/home/ros/.bash_aliases,type=bind",
-        "source=${localWorkspaceFolder}/config/nanorc,target=/home/ros/.nanorc,type=bind",
-        "source=${localWorkspaceFolder}/config/vimrc,target=/home/ros/.vimrc,type=bind",
+        "source=${localEnv:HOME}/.ssh,target=/home/ubuntu/.ssh,type=bind,readonly",
+        "source=${localWorkspaceFolder}/config/aliases.sh,target=/home/ubuntu/.bash_aliases,type=bind",
+        "source=${localWorkspaceFolder}/config/nanorc,target=/home/ubuntu/.nanorc,type=bind",
+        "source=${localWorkspaceFolder}/config/vimrc,target=/home/ubuntu/.vimrc,type=bind",
     ],
     // Set the default user
     "remoteUser": "ubuntu"
