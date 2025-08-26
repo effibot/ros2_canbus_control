@@ -43,8 +43,6 @@ services:
     device_cgroup_rules:
       - 'c 188:* rmw'  # Allow access to USB serial devices (ttyUSB*)
       - 'c 166:* rmw'  # Allow access to ACM devices (ttyACM*)
-    # NVIDIA GPU support
-    runtime: nvidia
     ipc: host
     tty: true
     cap_add:
@@ -69,7 +67,7 @@ services:
       - QT_QPA_PLATFORM=xcb
       - GDK_BACKEND=wayland
       - MOZ_ENABLE_WAYLAND=1
-      - QT_X11_NO_MITSHM=1      
+      - QT_X11_NO_MITSHM=1
       # ROS specific
       - ROS_DOMAIN_ID=42
       - ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST

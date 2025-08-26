@@ -124,7 +124,7 @@ RUN runuser -l ${USERNAME} -c '/tmp/configure_zsh.sh ${USERNAME} ${HOME}' && rm 
 ENV ZDOTDIR=/home/${USERNAME}/.config/zsh
 
 # Install Rust for the user
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+RUN runuser -l ${USERNAME} -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y" \
     && chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/.cargo
 
 # Install eza via cargo
