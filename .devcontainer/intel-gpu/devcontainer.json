@@ -28,7 +28,8 @@
                 "betwo.b2-catkin-tools",
                 "Ranch-Hand-Robotics.rde-pack",
                 "KevinRose.vsc-python-indent",
-                "mgesbert.python-path"
+                "mgesbert.python-path",
+                "zachflower.uncrustify"
             ],
             "settings": {
                 "python.defaultInterpreterPath": "/usr/bin/python3",

@@ -11,10 +11,8 @@
  */
 //! Call the base class constructor providing a string embedding the node name
 //! Initialize other members at will
-SpeedControlNode::SpeedControlNode()
-    : Node("speed_control_node")
+SpeedControlNode::SpeedControlNode() : Node("speed_control_node")
 {
-
   //! Declare each parameter
   //! Simplest syntax is, for any type:
   //! declare_parameter(NAME_STRING, DEFAULT_VALUE, DESCRIPTOR);
@@ -33,13 +31,9 @@ SpeedControlNode::SpeedControlNode()
   //!   ...
   //! );
   //! This object will be used later on to publish messages
-  speed_publisher_ = this->create_publisher<std_msgs::msg::Float64>(
-      "/motor1/actual_speed",
-      rclcpp::QoS(10));
+  speed_publisher_ = this->create_publisher<std_msgs::msg::Float64>("/motor1/actual_speed", rclcpp::QoS(10));
 
-  reference_publisher_ = this->create_publisher<std_msgs::msg::Float64>(
-      "/motor1/reference_speed_pub",
-      rclcpp::QoS(10));
+  reference_publisher_ = this->create_publisher<std_msgs::msg::Float64>("/motor1/reference_speed_pub", rclcpp::QoS(10));
 
   //! Initialize a subscriber with create_subscription from the base class:
   //! this->create_subscription<INTERFACE_TYPE>(
@@ -49,14 +43,10 @@ SpeedControlNode::SpeedControlNode()
   //!   (...)
   //! );
   reference_subscriber_ = this->create_subscription<std_msgs::msg::Float64>(
-      "/motor1/reference_speed_sub",
-      rclcpp::QoS(10),
-      std::bind(
-          &SpeedControlNode::msg_callback,
-          this,
-          std::placeholders::_1));
+      "/motor1/reference_speed_sub", rclcpp::QoS(10),
+      std::bind(&SpeedControlNode::msg_callback, this, std::placeholders::_1));
 
-  tty_fd = adapter_init(tty_device, baudrate); // Configurazione porta seriale
+  tty_fd = adapter_init(tty_device, baudrate);  // Configurazione porta seriale
 
   printf("configurazione porta seriale completata\n");
 
@@ -68,7 +58,7 @@ SpeedControlNode::SpeedControlNode()
   command_settings(tty_fd, speed, CANUSB_MODE_NORMAL, CANUSB_FRAME_STANDARD);
   printf("CANUSB configurata\n");
 
-  usleep(0.1 * 1e6); // Tempo necessario alla configurazione della pennetta USB
+  usleep(0.1 * 1e6);  // Tempo necessario alla configurazione della pennetta USB
 
   current_state = request_status_word(tty_fd);
 
@@ -82,7 +72,7 @@ SpeedControlNode::SpeedControlNode()
 
   nmt_data = 0x0101;
 
-  frame_send(tty_fd, CANUSB_FRAME_STANDARD, (unsigned char)0x00, (unsigned char)0x00, (unsigned char *)&nmt_data, 2);
+  frame_send(tty_fd, CANUSB_FRAME_STANDARD, (unsigned char)0x00, (unsigned char)0x00, (unsigned char*)&nmt_data, 2);
 
   usleep(0.1 * 1e6);
 
@@ -95,7 +85,7 @@ SpeedControlNode::SpeedControlNode()
   first_entry = index << 16 | subindex << 8 | object_len;
 
   printf("MAPPING:\n");
-  result = mapPDO(tty_fd, node_id, RPDO, 1, (unsigned char *)&first_entry, 1);
+  result = mapPDO(tty_fd, node_id, RPDO, 1, (unsigned char*)&first_entry, 1);
 
   //! Logging macro used to deliver a message to the logging subsystem, INFO level
   RCLCPP_INFO(this->get_logger(), "Publisher initialized");
@@ -108,11 +98,8 @@ SpeedControlNode::SpeedControlNode()
     //! providing an std::chrono::duration as the period and a call wrapper for
     //! the callback, capturing the node object
     //! Since this callback must be void, the wrapper has no arguments specified
-    pub_timer_ = this->create_wall_timer(
-        std::chrono::milliseconds(PUB_PERIOD),
-        std::bind(
-            &SpeedControlNode::pub_timer_callback,
-            this));
+    pub_timer_ = this->create_wall_timer(std::chrono::milliseconds(PUB_PERIOD),
+                                         std::bind(&SpeedControlNode::pub_timer_callback, this));
   }
 }
 
@@ -134,7 +121,6 @@ void SpeedControlNode::msg_callback(const std_msgs::msg::Float64::SharedPtr msg)
 
 void SpeedControlNode::publish_speed()
 {
-
   auto start_time = this->get_clock()->now();
 
   printf("ref speed: %.3f\n", rpm);
@@ -182,7 +168,7 @@ void SpeedControlNode::pub_timer_callback(void)
   publish_speed();
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
   //! This automatically creates the global context->DDS participant for this application
   //! and parses all ROS-specific input arguments eventually passed to the new process
