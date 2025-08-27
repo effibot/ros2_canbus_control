@@ -66,7 +66,7 @@ enum class CANMode
 	LOOPBACK_SILENT = 0x03
 };
 
-enum class USBVCOMBaudRate
+enum class USBBaud
 {
 	BAUD_9600 = 9600,
 	BAUD_19200 = 19200,
@@ -76,15 +76,15 @@ enum class USBVCOMBaudRate
 	BAUD_200000 = 2000000
 };
 
-#define USBVCOM_MIN_BAUD_RATE USBVCOMBaudRate::BAUD_9600
-#define USBVCOM_MAX_BAUD_RATE USBVCOMBaudRate::BAUD_200000
-#define USBVCOM_DEFAULT_BAUD_RATE USBVCOMBaudRate::BAUD_200000
+#define USB_MIN_BAUD_RATE USBBaud::BAUD_9600
+#define USB_MAX_BAUD_RATE USBBaud::BAUD_200000
+#define USB_DEFAULT_BAUD_RATE USBBaud::BAUD_200000
 
 class USBCANDriver
 {
 public:
 USBCANDriver(const std::string& device_path, CANSpeed speed = CANSpeed::SPEED_500K,
-             const USBVCOMBaudRate serial_baud = USBVCOM_DEFAULT_BAUD_RATE,
+             const USBBaud serial_baud = USB_DEFAULT_BAUD_RATE,
              rclcpp::Logger logger = rclcpp::get_logger("USBCANDriver"));
 ~USBCANDriver();
 
@@ -124,11 +124,11 @@ rclcpp::Logger getLogger() const
 {
 	return logger_;
 }
-USBVCOMBaudRate getSerialBaudRate() const
+USBBaud getSerialBaudRate() const
 {
 	return serial_baud_;
 }
-void setSerialBaudRate(USBVCOMBaudRate baud_rate)
+void setSerialBaudRate(USBBaud baud_rate)
 {
 	serial_baud_ = baud_rate;
 
@@ -148,7 +148,7 @@ bool is_connected_;
 std::string last_error_;
 rclcpp::Logger logger_;
 bool debug_enabled_ = false;
-USBVCOMBaudRate serial_baud_;
+USBBaud serial_baud_;
 
 // Low-level serial communication
 bool openSerial();
