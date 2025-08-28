@@ -3,13 +3,14 @@
  * @brief USB-CAN adapter driver for ROS2
  * This file defines the USBCANDriver class which provides methods to initialize,
  * configure, send, and receive CAN frames using a USB-CAN adapter built by Waveshare.
- * The implementation is based on the USB-CAN-A example from Waveshare plus additional
- * features for ROS2 integration and error logging/handling.
- * This version will also include filtering and masking capabilities as stated in the CAN2.0 spec.
- * Conversely to the original C implementation, this C++ version encapsulates functionality
- * within a class, uses RAII for resource management, and provides a cleaner interface.
- * Also, includes utility functions for converting frame content to/from byte arrays
- * so that they are readable by human operators.
+ * The implementation is based on the USB-CAN-A example from Waveshare (canusb.c) and the ros2_canopen package.
+ * Moreover, it includes:
+ * - support for different CAN speeds and modes,
+ * - support for different serial baud rates,
+ * - support for both standard and extended CAN frames,
+ * - support for filtering and masking (currently both zeroed in the canusb.c example),
+ * - export interface to ROS2 (publish/subscribe) so that nodes can send and read DSP402 frames,
+ * - additional features for ROS2 integration and error logging/handling.
  * @author Andrea Efficace
  * @date August 2025
  */
@@ -25,18 +26,30 @@
 namespace usb_can_bridge
 {
 // CAN frame structure
-struct CANFrame
-{
-	uint32_t can_id; // CAN identifier
-	uint8_t dlc; // Data length code (0-8)
-	uint8_t data[8]; // Data payload
-	bool is_extended; // Extended frame flag
-	bool is_rtr; // Remote transmission request
+struct CANFrame {
+	uint32_t can_id; // ID CAN (11 or 29 valid bits)
+	uint8_t dlc;     // Data length code (0-8)
+	uint8_t flags;   // Bitmask: EFF, RTR, ERR
+	uint8_t data[8]; // Payload
+	uint64_t timestamp; // Timestamp in ns (monotonic)
 
-	CANFrame() : can_id(0), dlc(0), is_extended(false), is_rtr(false)
-	{
-		for (int i = 0; i < 8; i++)
-			data[i] = 0;
+	// Flag bitmask
+	static constexpr uint8_t FLAG_EFF = 0x01; // Extended Frame Format (29 bit)
+	static constexpr uint8_t FLAG_RTR = 0x02; // Remote Transmission Request
+	static constexpr uint8_t FLAG_ERR = 0x04; // Error Frame
+
+	CANFrame() : can_id(0), dlc(0), flags(0), timestamp(0) {
+		std::memset(data, 0, sizeof(data));
+	}
+
+	inline bool isExtended() const {
+		return flags & FLAG_EFF;
+	}
+	inline bool isRTR() const {
+		return flags & FLAG_RTR;
+	}
+	inline bool isError() const {
+		return flags & FLAG_ERR;
 	}
 };
 
@@ -58,13 +71,15 @@ enum class CANSpeed
 };
 
 // Operating modes - used by the adapter, not by the CAN bus itself
-enum class CANMode
+enum class USBMode
 {
 	NORMAL = 0x00, // This should be always used unless for testing
 	LOOPBACK = 0x01,
 	SILENT = 0x02,
 	LOOPBACK_SILENT = 0x03
 };
+
+#define USB_DEF_MODE USBMode::NORMAL // Default operating mode for the adapter
 
 enum class USBBaud
 {
@@ -76,9 +91,10 @@ enum class USBBaud
 	BAUD_200000 = 2000000
 };
 
-#define USB_MIN_BAUD_RATE USBBaud::BAUD_9600
-#define USB_MAX_BAUD_RATE USBBaud::BAUD_200000
-#define USB_DEFAULT_BAUD_RATE USBBaud::BAUD_200000
+#define USB_MIN_BAUD_RATE USBBaud::BAUD_9600            // Minimum supported baud rate for the serial interface
+#define USB_MAX_BAUD_RATE USBBaud::BAUD_200000          // Maximum supported baud rate for the serial interface
+#define USB_DEFAULT_BAUD_RATE USBBaud::BAUD_200000      // Default baud rate for the serial interface
+#define MIN_CONF_SLEEP_MS 1000                  // Minimum sleep time after configuration commands (in milliseconds)
 
 class USBCANDriver
 {
@@ -90,7 +106,7 @@ USBCANDriver(const std::string& device_path, CANSpeed speed = CANSpeed::SPEED_50
 
 // Initialization
 bool initialize();
-bool configure(CANSpeed speed, CANMode mode = CANMode::NORMAL);
+bool configureCANBus(CANSpeed speed, USBMode mode = USBMode::NORMAL);
 void shutdown();
 void setMask(uint32_t mask);
 void setFilter(uint32_t filter);
@@ -112,6 +128,10 @@ std::string getLastError() const
 {
 	return last_error_;
 }
+
+// Utility functions
+static CANSpeed speedFromInt(int speed_bps);
+static std::string speedToString(CANSpeed speed);
 std::string getDevicePath() const
 {
 	return device_path_;
@@ -134,12 +154,6 @@ void setSerialBaudRate(USBBaud baud_rate)
 
 }
 
-// Utility functions
-static CANSpeed speedFromInt(int speed_bps);
-static std::string speedToString(CANSpeed speed);
-void setMaskAndFilter(uint32_t mask, uint32_t filter);
-void clearMaskAndFilter();
-
 private:
 std::string device_path_;
 CANSpeed can_speed_;
@@ -158,15 +172,23 @@ bool configureSerial();
 // Protocol handling
 bool sendCommand(const std::vector<uint8_t>& command);
 bool receiveResponse(std::vector<uint8_t>& response, int timeout_ms);
-bool sendSettingsCommand(CANSpeed speed, CANMode mode);
+bool sendSettingsCommand(CANSpeed speed, USBMode mode);
 uint8_t calculateChecksum(const std::vector<uint8_t>& data);
 bool isFrameComplete(const std::vector<uint8_t>& frame);
+void setMaskAndFilter(uint32_t mask, uint32_t filter);
+void clearMaskAndFilter();
 
 // Frame conversion
 std::vector<uint8_t> frameToBytes(const CANFrame& frame);
 CANSpeed speedFromInt(int speed_bps);
 std::string speedToString(CANSpeed speed);
-void setError(const std::string& error);
+void setError(const std::string& error){
+	last_error_ = error;
+	if (debug_enabled_)
+	{
+		RCLCPP_ERROR(logger_, "%s", error.c_str());
+	}
+}
 };
 
 }  // namespace usb_can_bridge

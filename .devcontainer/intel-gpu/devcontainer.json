@@ -29,7 +29,8 @@
                 "Ranch-Hand-Robotics.rde-pack",
                 "KevinRose.vsc-python-indent",
                 "mgesbert.python-path",
-                "zachflower.uncrustify"
+                "zachflower.uncrustify",
+                "aaron-bond.better-comments"
             ],
             "settings": {
                 "python.defaultInterpreterPath": "/usr/bin/python3",

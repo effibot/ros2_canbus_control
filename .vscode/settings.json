@@ -8,7 +8,8 @@
         "*.urdf": "xml",
         "*.sdf": "xml",
         "*.launch": "xml",
-        "*.launch.py": "python"
+        "*.launch.py": "python",
+        "thread": "cpp"
     },
     // Python settings for ROS2 development
     "python.defaultInterpreterPath": "/usr/bin/python3",
@@ -65,6 +66,8 @@
     "cSpell.words": [
         "Efficace",
         "rclcpp",
-        "Waveshare"
+        "Waveshare",
+        "xacro",
+        "canusb"
     ]
 }
