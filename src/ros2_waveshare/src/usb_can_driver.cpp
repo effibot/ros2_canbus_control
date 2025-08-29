@@ -13,7 +13,7 @@
 namespace usb_can_bridge {
 
 // Constructor
-USBCANDriver::USBCANDriver(const std::string& device_path, CANSpeed speed, const USBBaud serial_baud, rclcpp::Logger logger)
+USBCANDriver::USBCANDriver(const std::string& device_path, USBCANBaud speed, const USBBaud serial_baud, rclcpp::Logger logger)
 	: device_path_(device_path), can_speed_(speed), serial_fd_(-1), is_connected_(false),
 	logger_(logger), serial_baud_(serial_baud) {
 }
@@ -40,7 +40,7 @@ bool USBCANDriver::initialize()
 	// Wait for device to settle
 	std::this_thread::sleep_for(std::chrono::milliseconds(MIN_CONF_SLEEP_MS));
 
-	if (!configureCANBus(can_speed_, USBMode::NORMAL))
+	if (!configureCANBus(can_speed_, USBCANMode::NORMAL))
 	{
 		RCLCPP_ERROR(logger_, "Failed to configure CAN settings");
 		closeSerial();
@@ -115,7 +115,7 @@ bool USBCANDriver::configureSerial()
 
 //! -- CAN Bus Configuration --
 // Configure CAN bus settings
-bool USBCANDriver::configureCANBus(CANSpeed speed, USBMode mode)
+bool USBCANDriver::configureCANBus(USBCANBaud speed, USBCANMode mode)
 {
 	can_speed_ = speed;
 	return sendSettingsCommand(speed, mode);
