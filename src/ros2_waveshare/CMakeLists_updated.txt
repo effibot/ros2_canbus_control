@@ -1,0 +1,83 @@
+# CMakeLists.txt for ros2_waveshare with new frame system
+
+cmake_minimum_required(VERSION 3.5)
+project(ros2_waveshare)
+
+# Default to C++17
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# Find dependencies
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(can_msgs REQUIRED)
+
+# Include directories
+include_directories(include)
+
+# Frame system library
+set(FRAME_SOURCES
+  src/frames/usb_can_frame_examples.cpp
+)
+
+set(FRAME_HEADERS
+  include/ros2_waveshare/frames/usb_can_frame_base.hpp
+  include/ros2_waveshare/frames/usb_can_frame_20byte.hpp
+  include/ros2_waveshare/frames/usb_can_frame_variable.hpp
+  include/ros2_waveshare/frames/usb_can_settings_frame.hpp
+  include/ros2_waveshare/frames/usb_can_fixed_frames.hpp
+  include/ros2_waveshare/frames/usb_can_variable_frames.hpp
+  include/ros2_waveshare/frames/usb_can_frame_factory.hpp
+  include/ros2_waveshare/frames/usb_can_frame_builder.hpp
+  include/ros2_waveshare/frames/usb_can_frames.hpp
+)
+
+# Create frame library
+add_library(usb_can_frames ${FRAME_SOURCES})
+target_include_directories(usb_can_frames PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+# Main driver library (when implemented)
+# add_library(usb_can_driver src/usb_can_driver_updated.cpp)
+# target_link_libraries(usb_can_driver usb_can_frames)
+# ament_target_dependencies(usb_can_driver rclcpp std_msgs can_msgs)
+
+# Example executable
+add_executable(frame_examples src/frames/usb_can_frame_examples.cpp)
+target_link_libraries(frame_examples usb_can_frames)
+ament_target_dependencies(frame_examples rclcpp)
+
+# Install targets
+install(TARGETS
+  usb_can_frames
+  frame_examples
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# Install headers
+install(DIRECTORY include/
+  DESTINATION include/
+)
+
+# Testing
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  ament_lint_auto_find_test_dependencies()
+  
+  # Add frame system tests
+  find_package(ament_cmake_gtest REQUIRED)
+  
+  ament_add_gtest(test_frames test/test_frames.cpp)
+  target_link_libraries(test_frames usb_can_frames)
+  ament_target_dependencies(test_frames rclcpp)
+endif()
+
+ament_package()

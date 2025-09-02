@@ -33,7 +33,11 @@ enum class USBCANFrameFmt
 	STD = 0x01,
 	EXT = 0x02
 };
-
+enum class USBCANFrameFmtVar
+{
+	DATA = 0,
+	REMOTE = 1
+};
 //? USB-CAN-A adapter speed enum
 enum class USBCANBaud
 {
