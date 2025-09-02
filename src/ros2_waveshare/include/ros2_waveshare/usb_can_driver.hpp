@@ -87,38 +87,7 @@ struct USBCANAdapterSettingFrame {
 	}
 };
 
-/**
- * @brief CAN Adapter frame structure
- * This structure represents the CAN frame as used by the USB-CAN-A adapter.
- * The adapter can use both standard (11-bit ID) and extended (29-bit ID) frames
- * but the protocol supports both fixed (20 bytes) and variable length frames.
- * The implementation uses an abstract CANFrame structure to represent both types and
- * a factory method to convert between the abstract and adapter-specific formats.
- * For the fixed frame format, the complete frame consists of:
- * - Start byte (always {0xAA})
- * - Message header byte (always {0x55})
- * - Type byte {0x01}
- * - Framework type byte {0x01}
- * - Frame ID [4] bytes, little-endian
- * - Frame Data Length Code (DLC) byte (0-8)
- * - Frame Data [8] bytes (padded with zeros if DLC < 8)
- * - Reserved byte (always {0x00})
- * - Checksum Code (The low 8 bits of the cumulative sum from frame type to error code )
- *
- * For the variable length frame format, the complete frame consists of:
- * - Start byte (always {0xAA})
- * - Type byte:
- * 	- [Frame Type] bit 5: 0 for standard frame (2 bytes ID), 1 for extended frame (4 bytes ID)
- * 	- [Frame Format] bit 4: 0 for data frame, 1 for remote frame
- * 	- [DLC] bits 3-0: Data Length Code (0-8)
- * - Frame ID [2 or 4] bytes, little-endian
- * - Frame Data [0-8] bytes
- * - End byte (always {0x55})
- * @note The variable length frame format is more flexible and is used in this implementation as default
- */
-struct USBCANAdapterBaseFrame {
 
-};
 
 
 #define MIN_CONF_SLEEP_MS 1000                  // Minimum sleep time after configuration commands (in milliseconds)

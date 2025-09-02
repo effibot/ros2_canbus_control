@@ -18,7 +18,7 @@ enum class USBCANConst
 	RESERVED1 = 0x00,
 	RESERVED2 = 0x00,
 	RESERVED3 = 0x00,
-	END_CODE = 0x55
+	END_BYTE = 0x55
 };
 
 //? USB-CAN-A adapter type enum
@@ -84,7 +84,7 @@ enum class USBCANFrameType {
 	STD_FIXED,
 	EXT_FIXED,
 	SETTINGS
-}
+};
 
 //? defines of default settings
 #define USB_DEF_FILTER_SETTING 0x00000000       // Default filter setting (accept all IDs)

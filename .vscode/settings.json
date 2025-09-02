@@ -159,6 +159,7 @@
     "cmake.ignoreCMakeListsMissing": true,
     "github.copilot.chat.codeGeneration.useInstructionFiles": true,
     "cSpell.words": [
+        "canopen",
         "canusb",
         "Efficace",
         "rclcpp",
