@@ -12,6 +12,7 @@
 #include <array>
 #include <algorithm>
 #include <cstring>
+#include <numeric>
 
 namespace usb_can_bridge
 {
