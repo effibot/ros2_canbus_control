@@ -163,6 +163,7 @@
         "canopen",
         "canusb",
         "Efficace",
+        "kbps",
         "rclcpp",
         "TCGETS",
         "TCSETS",
