@@ -274,7 +274,7 @@ enum class VarSizeIndex : uint {
 	return static_cast<uint>(value);
 }
 
-[[nodiscard]] constexpr auto to_uint(VariableSizeIndex value) noexcept {
+[[nodiscard]] constexpr auto to_uint(VarSizeIndex value) noexcept {
 	return static_cast<uint>(value);
 }
 
