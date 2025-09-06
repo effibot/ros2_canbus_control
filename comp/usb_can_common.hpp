@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <stdexcept>
+#include <cstddef>
 
 namespace USBCANBridge
 {
@@ -171,7 +173,7 @@ enum class RTX : uint8_t {
 	OFF = 0x01
 };
 
-enum class FixedSizeIndex : uint {
+enum class FixedSizeIndex : std::size_t {
 	/**
 	 * @brief USB-CAN-A adapter fixed frame byte index enumeration
 	 * This enum defines the byte indices for the fixed 20-byte frame format used by the USB-CAN-A adapter.
@@ -211,7 +213,7 @@ enum class FixedSizeIndex : uint {
 	CHECKSUM = 19
 };
 
-enum class VarSizeIndex : uint {
+enum class VarSizeIndex : std::size_t {
 	/**
 	 * @brief USB-CAN-A adapter variable frame byte index enumeration
 	 * This enum defines the byte indices for the variable length frame format used by the USB-CAN-A adapter.
@@ -229,8 +231,11 @@ enum class VarSizeIndex : uint {
 	 * @note This enum is specifically for the variable length frame format and may not apply to fixed frames.
 	 */
 	START = 0,
-	TYPE = 1,
-	ID_START = 2,
+	TYPE_HEADER = 1,
+	FRAME_TYPE = 2,
+	FRAME_FMT = 3,
+	DLC = 4,
+	ID_START = 5,
 	// ID_END is dynamic based on ID size
 	// DATA_START is dynamic based on ID size
 	// DATA_END is dynamic based on ID size
@@ -271,12 +276,93 @@ enum class VarSizeIndex : uint {
 }
 
 [[nodiscard]] constexpr auto to_uint(FixedSizeIndex value) noexcept {
-	return static_cast<uint>(value);
+	return static_cast<std::size_t>(value);
 }
 
 [[nodiscard]] constexpr auto to_uint(VarSizeIndex value) noexcept {
-	return static_cast<uint>(value);
+	return static_cast<std::size_t>(value);
 }
+
+[[nodiscard]] constexpr VarSizeIndex to_VarSizeIndex(std::size_t value) noexcept {
+	return static_cast<VarSizeIndex>(value);
+}
+
+// redefine math operators for VarSizeIndex, so that we can do things like ID_END = ID_START + 1
+constexpr VarSizeIndex operator+(VarSizeIndex lhs, std::size_t rhs) noexcept {
+	return static_cast<VarSizeIndex>(to_uint(lhs) + rhs);
+}
+
+constexpr VarSizeIndex operator+(std::size_t lhs, VarSizeIndex rhs) noexcept {
+	return static_cast<VarSizeIndex>(lhs + to_uint(rhs));
+}
+
+constexpr VarSizeIndex operator-(VarSizeIndex lhs, std::size_t rhs) noexcept {
+	return static_cast<VarSizeIndex>(to_uint(lhs) - rhs);
+}
+
+constexpr VarSizeIndex operator-(std::size_t lhs, VarSizeIndex rhs) noexcept {
+	return static_cast<VarSizeIndex>(lhs - to_uint(rhs));
+}
+
+constexpr VarSizeIndex& operator+=(VarSizeIndex& lhs, std::size_t rhs) noexcept {
+	lhs = lhs + rhs;
+	return lhs;
+}
+
+constexpr VarSizeIndex& operator-=(VarSizeIndex& lhs, std::size_t rhs) noexcept {
+	lhs = lhs - rhs;
+	return lhs;
+}
+
+constexpr bool operator<(VarSizeIndex lhs, std::size_t rhs) noexcept {
+	return to_uint(lhs) < rhs;
+}
+
+constexpr bool operator<(std::size_t lhs, VarSizeIndex rhs) noexcept {
+	return lhs < to_uint(rhs);
+}
+
+constexpr bool operator<=(VarSizeIndex lhs, std::size_t rhs) noexcept {
+	return to_uint(lhs) <= rhs;
+}
+
+constexpr bool operator<=(std::size_t lhs, VarSizeIndex rhs) noexcept {
+	return lhs <= to_uint(rhs);
+}
+
+constexpr bool operator>(VarSizeIndex lhs, std::size_t rhs) noexcept {
+	return to_uint(lhs) > rhs;
+}
+
+constexpr bool operator>(std::size_t lhs, VarSizeIndex rhs) noexcept {
+	return lhs > to_uint(rhs);
+}
+
+constexpr bool operator>=(VarSizeIndex lhs, std::size_t rhs) noexcept {
+	return to_uint(lhs) >= rhs;
+}
+
+constexpr bool operator>=(std::size_t lhs, VarSizeIndex rhs) noexcept {
+	return lhs >= to_uint(rhs);
+}
+
+constexpr bool operator==(VarSizeIndex lhs, std::size_t rhs) noexcept {
+	return to_uint(lhs) == rhs;
+}
+
+constexpr bool operator==(std::size_t lhs, VarSizeIndex rhs) noexcept {
+	return lhs == to_uint(rhs);
+}
+
+constexpr bool operator!=(VarSizeIndex lhs, std::size_t rhs) noexcept {
+	return to_uint(lhs) != rhs;
+}
+
+constexpr bool operator!=(std::size_t lhs, VarSizeIndex rhs) noexcept {
+	return lhs != to_uint(rhs);
+}
+
+
 
 // Helper function to create variable frame type byte (C++17 style)
 [[nodiscard]] constexpr auto make_variable_type_byte(FrameType type, FrameFmt fmt, uint8_t dlc) {
@@ -305,6 +391,37 @@ enum class VarSizeIndex : uint {
 	       (fmt == FrameFmt::DATA_VAR ? to_uint8(FrameFmt::DATA_VAR) : to_uint8(FrameFmt::REMOTE_VAR)) |
 	       (dlc & 0x0F);
 }
+
+[[nodiscard]] constexpr auto parse_variable_type_byte(uint8_t type_byte, FrameType& out_type, FrameFmt& out_fmt, uint8_t& out_dlc) {
+	/**
+	 * @brief Parse the type byte of a variable length USB-CAN-A adapter frame
+	 * This function extracts the frame type, frame format, and data length code (DLC)
+	 * from the provided type byte of a variable length frame.
+	 * The type byte is structured as follows:
+	 * - Bits 6-7: Always set to 1 (0xC0)
+	 * - Bit 5: Frame type (0 for standard, 1 for extended)
+	 * - Bit 4: Frame format (0 for data frame, 1 for remote frame)
+	 * - Bits 0-3: Data Length Code (DLC) (0-8)
+	 * @param type_byte The type byte to parse
+	 * @param out_type Reference to store the extracted frame type
+	 * @param out_fmt Reference to store the extracted frame format
+	 * @param out_dlc Reference to store the extracted data length code
+	 * @note The DLC should be in the range of 0 to 8, as per CAN protocol specifications.
+	 */
+
+	if ((type_byte & 0xC0) != to_uint8(Type::DATA_VAR)) {
+		throw std::invalid_argument("Invalid type byte for variable length frame");
+	}
+
+	out_type = (type_byte & 0x20) ? FrameType::EXT_VAR : FrameType::STD_VAR;
+	out_fmt = (type_byte & 0x10) ? FrameFmt::REMOTE_VAR : FrameFmt::DATA_VAR;
+	out_dlc = type_byte & 0x0F;
+
+	if (out_dlc > 8) {
+		throw std::out_of_range("DLC is out of range for CAN frame (0-8)");
+	}
+}
+
 
 /*
    TODO: move this to usb_can_frame.hpp and change the arguments to the baseFrame class

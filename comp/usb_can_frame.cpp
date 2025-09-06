@@ -1,171 +1,164 @@
 #include "usb_can_frame.hpp"
+#include "usb_can_common.hpp"
 
-namespace USBCANBridge  // Changed to match header namespace
-{
-class USBCANFrame {
-protected:
-USBCANAdapterBaseFrame* base_frame_ptr;
-public:
-USBCANFrame() : base_frame_ptr(nullptr) {
-}
-virtual ~USBCANFrame() = default;
-virtual std::vector<uint8_t> serialize() const = 0;
-virtual bool deserialize(const std::vector<uint8_t>& data) = 0;
-virtual USBCANFrameType getType() const = 0;
-virtual size_t getFrameSize() const = 0;
-virtual bool isValid() const = 0;
-bool hasValidStart() const {
-	return base_frame_ptr && base_frame_ptr->isValidStart();
-}
-};
+#include <iostream>
+#include <iomanip>
+#include <vector>
 
-class USBCANFrame20Byte : public USBCANFrame {
-protected:
-USBCANAdapter20ByteFrame frame_data;
-public:
-USBCANFrame20Byte() : USBCANFrame() {
-	base_frame_ptr = &frame_data;
-}
-uint8_t calculateChecksum(const USBCANAdapter20ByteFrame& frame) const {
-	/**
-	 * @brief Calculate checksum for a 20-byte USB-CAN-A adapter frame
-	 * The checksum is the low 8 bits of the cumulative sum from the frame type byte
-	 * to the reserved byte (inclusive).
-	 * @param frame The 20-byte frame for which to calculate the checksum
-	 * @return The calculated checksum byte
-	 */
+using namespace USBCANBridge;
 
-	// Init
-	uint32_t sum = 0;
-	// Sum bytes from frame type (data[0]) to reserved (data[17])
-	sum += frame.data[0];         // Type byte
-	sum += std::accumulate(frame.data.begin() + 1, frame.data.end(), 0U);
-	// Return low 8 bits
-	return static_cast<uint8_t>(sum & 0xFF);
-
-}
-bool validateChecksum(const USBCANAdapter20ByteFrame& frame) const {
-	/**
-	 * @brief Validate checksum for a 20-byte USB-CAN-A adapter frame
-	 * Compares the stored checksum byte with a newly calculated checksum.
-	 * @param frame The 20-byte frame to validate
-	 * @return True if the checksum is valid, false otherwise
-	 */
-	return frame.checksum == calculateChecksum(frame);
-}
-std::vector<uint8_t> serialize() const override {
-	/**
-	 * @brief Serialize the 20-byte USB-CAN-A adapter frame to a byte vector
-	 * This method converts the frame structure into a byte vector suitable for
-	 * transmission or storage. It includes the start byte, message header, data bytes,
-	 * and checksum.
-	 * @return A vector of bytes representing the serialized frame
-	 */
-
-	//* Checksum is calculated during serialization to ensure it reflects current data
-	const_cast<USBCANFrame20Byte*>(this)->frame_data.checksum = calculateChecksum(this->frame_data);
-	// Allocate vector and fill it
-	std::vector<uint8_t> serialized;
-	serialized.reserve(20);
-	// Fill vector with frame data
-	serialized.push_back(frame_data.start_byte);
-	serialized.push_back(frame_data.msg_header);
-	serialized.insert(serialized.end(), frame_data.data.begin(), frame_data.data.end());
-	serialized.push_back(frame_data.checksum);
-	return serialized;
-}
-bool deserialize(const std::vector<uint8_t>& raw_data) override {
-	/**
-	 * @brief Deserialize a 20-byte USB-CAN-A adapter frame from a byte vector
-	 * This method populates the frame structure from the provided byte vector.
-	 * It checks for correct size and copies the data into the frame structure.
-	 * This method overwrites existing frame data of the calling object.
-	 * @param raw_data The byte vector containing the serialized frame data
-	 * @return True if deserialization is successful, false otherwise
-	 */
-	// Check size of the input data
-	if (raw_data.size() != 20) return false;
-
-	//? As the deserialization overwrites the existing data, the header bytes are already set
-
-	//* Just copy the data bytes from the input vector
-	std::copy(raw_data.begin() + 2, raw_data.begin() + 19, frame_data.data.begin());
-	// Copy checksum byte
-	frame_data.checksum = raw_data[19];
-	// Validate checksum
-	return validateChecksum(frame_data);
-};
-
-USBCANFrameType getType() const override {
-	/**
-	 * @brief Determine the frame type (standard or extended) based on the frame data
-	 * The frame type is determined by the value in data[3]:
-	 * - 0x01 indicates a standard frame
-	 * - 0x02 indicates an extended frame
-	 * @return The frame type as a USBCANFrameType enum value
-	 */
-
-	// retrieve the frame type byte
-	USBCANFrameType frame_type_byte = static_cast<USBCANFrameType>(frame_data.getFrameType());
-	// Determine frame type based on the byte value
-	if (frame_type_byte == USBCANFrameType::STD_FIXED) {
-		return USBCANFrameType::STD_FIXED;
-	} else if (frame_type_byte == USBCANFrameType::EXT_FIXED) {
-		return USBCANFrameType::EXT_FIXED;
-	} else {
-		throw std::runtime_error("Unknown frame type in USBCANFrame20Byte");
+// Helper function to print byte data in hex format
+void printBytes(const std::vector<uint8_t>& data, const std::string& label) {
+	std::cout << label << " (" << data.size() << " bytes): ";
+	for (const auto& byte : data) {
+		std::cout << "0x" << std::hex << std::setw(2) << std::setfill('0')
+		          << static_cast<int>(byte) << " ";
 	}
+	std::cout << std::dec << std::endl;
+}
 
-}
-size_t getFrameSize() const override {
-	return 20;
-}
-bool isValid() const override {
-	return hasValidStart() && validateChecksum(frame_data);
-}
-void setDataBytes(const std::vector<uint8_t>& data) {
-	/**
-	 * @brief Set the data bytes of the frame
-	 * This method allows setting the data bytes of the frame.
-	 * It ensures that the data size does not exceed 17 bytes.
-	 * @param data The vector of data bytes to set
-	 */
-	if (data.size() > 17) {
-		const std::string msg = "Data size is " + std::to_string(data.size()) + ", but must be 17 bytes or less for USBCANAdapter20ByteFrame";
-		throw std::invalid_argument(msg);
-	}
-	(this)->frame_data.setData(data);
-}
-uint8_t getDataByte(size_t index) const {
-	return frame_data.at(index);
-}
-void setDataByte(size_t index, uint8_t value) {
-	frame_data.at(index) = value;
-}
-};
-
-
-} // namespace USBCANBridge
 int main() {
-	// Example usage
-	USBCANBridge::USBCANFrame20Byte frame;
-	std::vector<uint8_t> example_data ={
-		0x01, // Type byte
-		0x01, // Frame type (standard)
-		0x01, // Frame format (data frame)
-		0x23, 0x01, 0x00, 0x00, // ID (0x00000123)
-		0x07, // DLC (8 bytes)
-		0x1, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, // Data bytes
-		0x00 // Reserved
-	};
-	frame.setDataBytes(example_data);
-	std::vector<uint8_t> data = frame.serialize();
-	// print serialized data
-	for (auto byte : data) {
-		printf("%02X ", byte);
+	std::cout << "=== USB-CAN Frame Structure Demo ===" << std::endl;
+
+	try {
+		// ========== Fixed Size Frame Example ==========
+		std::cout << "\n--- Fixed Size Frame Example ---" << std::endl;
+
+		// Create a 20-byte fixed frame for standard data frame
+		fixedSize fixed_frame(Type::DATA_FIXED, FrameType::STD_FIXED, FrameFmt::DATA_FIXED);
+
+		// Display basic frame information
+		std::cout << "Fixed Frame Structure:" << std::endl;
+		std::cout << "  Frame size: " << fixed_frame.size() << " bytes" << std::endl;
+		std::cout << "  Type: 0x" << std::hex << static_cast<int>(to_uint8(fixed_frame.getType())) << std::dec << std::endl;
+		std::cout << "  Frame Type: 0x" << std::hex << static_cast<int>(to_uint8(fixed_frame.getFrameType())) << std::dec << std::endl;
+		std::cout << "  Frame Format: 0x" << std::hex << static_cast<int>(to_uint8(fixed_frame.getFrameFmt())) << std::dec << std::endl;
+
+		// Set frame properties
+		uint32_t can_id = 0x123; // Standard CAN ID
+		fixed_frame.setID(can_id);
+		fixed_frame.setDLC(8); // 8 bytes of data
+
+		std::cout << "  CAN ID: 0x" << std::hex << fixed_frame.getID() << std::dec << std::endl;
+		std::cout << "  DLC: " << static_cast<int>(fixed_frame.getDLC()) << std::endl;
+
+		// Set some sample data using individual byte setting
+		for (size_t i = 0; i < 8; ++i) {
+			fixed_frame.setData(i, static_cast<uint8_t>(0x10 + i));
+		}
+
+		// Display some data bytes
+		std::cout << "  Sample data bytes: ";
+		for (size_t i = 0; i < 4; ++i) {
+			std::cout << "0x" << std::hex << static_cast<int>(fixed_frame.getData(i)) << " ";
+		}
+		std::cout << std::dec << std::endl;
+
+		// Access frame data using array operators
+		std::cout << "  Start byte: 0x" << std::hex << static_cast<int>(fixed_frame[0]) << std::dec << std::endl;
+		std::cout << "  Header byte: 0x" << std::hex << static_cast<int>(fixed_frame[1]) << std::dec << std::endl;
+		std::cout << "  Type byte: 0x" << std::hex << static_cast<int>(fixed_frame[2]) << std::dec << std::endl;
+
+		// Validate the frame basic checks
+		std::cout << "  Valid start: " << (fixed_frame.isValidStart() ? "Yes" : "No") << std::endl;
+		std::cout << "  Valid length: " << (fixed_frame.isValidLength() ? "Yes" : "No") << std::endl;
+		std::cout << "  Valid ID: " << (fixed_frame.isValidID() ? "Yes" : "No") << std::endl;
+
+		// ========== Variable Size Frame Example ==========
+		std::cout << "\n--- Variable Size Frame Example ---" << std::endl;
+
+		// Create a variable length frame for extended data frame
+		varSize var_frame(FrameType::EXT_VAR, FrameFmt::DATA_VAR, 4);
+
+		std::cout << "Variable Frame Structure:" << std::endl;
+		std::cout << "  Frame size: " << var_frame.size() << " bytes" << std::endl;
+		std::cout << "  Type: 0x" << std::hex << static_cast<int>(to_uint8(var_frame.getType())) << std::dec << std::endl;
+		std::cout << "  Frame Type: " << (var_frame.getFrameType() == FrameType::EXT_VAR ? "Extended" : "Standard") << std::endl;
+		std::cout << "  Frame Format: " << (var_frame.getFrameFmt() == FrameFmt::DATA_VAR ? "Data" : "Remote") << std::endl;
+		std::cout << "  DLC: " << static_cast<int>(var_frame.getDLC()) << std::endl;
+
+		// Set frame properties
+		uint32_t extended_can_id = 0x12345678; // Extended CAN ID
+		var_frame.setID(extended_can_id);
+		std::cout << "  CAN ID: 0x" << std::hex << var_frame.getID() << std::dec << std::endl;
+
+		// Set some sample data (4 bytes as specified in DLC)
+		for (size_t i = 0; i < 4; ++i) {
+			var_frame.setData(i, static_cast<uint8_t>(0xA0 + i));
+		}
+
+		// Display some data bytes
+		std::cout << "  Sample data bytes: ";
+		for (size_t i = 0; i < 4; ++i) {
+			std::cout << "0x" << std::hex << static_cast<int>(var_frame.getData(i)) << " ";
+		}
+		std::cout << std::dec << std::endl;
+
+		// Validate the frame basic checks
+		std::cout << "  Valid start: " << (var_frame.isValidStart() ? "Yes" : "No") << std::endl;
+		std::cout << "  Valid length: " << (var_frame.isValidLength() ? "Yes" : "No") << std::endl;
+		std::cout << "  Valid ID: " << (var_frame.isValidID() ? "Yes" : "No") << std::endl;
+
+		// ========== Protocol Constants Demo ==========
+		std::cout << "\n--- Protocol Constants Demo ---" << std::endl;
+
+		std::cout << "USB-CAN Protocol Constants:" << std::endl;
+		std::cout << "  Start byte: 0x" << std::hex << static_cast<int>(to_uint8(Constants::START_BYTE)) << std::dec << std::endl;
+		std::cout << "  Message header: 0x" << std::hex << static_cast<int>(to_uint8(Constants::MSG_HEADER)) << std::dec << std::endl;
+		std::cout << "  End byte: 0x" << std::hex << static_cast<int>(to_uint8(Constants::END_BYTE)) << std::dec << std::endl;
+
+		std::cout << "\nSupported CAN Baud Rates:" << std::endl;
+		std::cout << "  1000K: 0x" << std::hex << static_cast<int>(to_uint8(CANBaud::SPEED_1000K)) << std::dec << std::endl;
+		std::cout << "  500K: 0x" << std::hex << static_cast<int>(to_uint8(CANBaud::SPEED_500K)) << std::dec << std::endl;
+		std::cout << "  250K: 0x" << std::hex << static_cast<int>(to_uint8(CANBaud::SPEED_250K)) << std::dec << std::endl;
+		std::cout << "  125K: 0x" << std::hex << static_cast<int>(to_uint8(CANBaud::SPEED_125K)) << std::dec << std::endl;
+
+		std::cout << "\nFrame Type Testing:" << std::endl;
+
+		// Test variable type byte creation
+		uint8_t type_byte = make_variable_type_byte(FrameType::STD_VAR, FrameFmt::DATA_VAR, 8);
+		std::cout << "  Variable type byte (STD, DATA, DLC=8): 0x" << std::hex << static_cast<int>(type_byte) << std::dec << std::endl;
+
+		type_byte = make_variable_type_byte(FrameType::EXT_VAR, FrameFmt::REMOTE_VAR, 0);
+		std::cout << "  Variable type byte (EXT, REMOTE, DLC=0): 0x" << std::hex << static_cast<int>(type_byte) << std::dec << std::endl;
+
+		// Test type byte parsing
+		FrameType parsed_type;
+		FrameFmt parsed_fmt;
+		uint8_t parsed_dlc;
+
+		parse_variable_type_byte(0xC8, parsed_type, parsed_fmt, parsed_dlc); // 0xC8 = STD, DATA, DLC=8
+		std::cout << "  Parsed type byte 0xC8: "
+		          << (parsed_type == FrameType::STD_VAR ? "STD" : "EXT") << ", "
+		          << (parsed_fmt == FrameFmt::DATA_VAR ? "DATA" : "REMOTE") << ", "
+		          << "DLC=" << static_cast<int>(parsed_dlc) << std::endl;
+
+		// ========== Index Enumeration Demo ==========
+		std::cout << "\n--- Index Enumeration Demo ---" << std::endl;
+
+		std::cout << "Fixed Frame Indices:" << std::endl;
+		std::cout << "  START: " << to_uint(FixedSizeIndex::START) << std::endl;
+		std::cout << "  HEADER: " << to_uint(FixedSizeIndex::HEADER) << std::endl;
+		std::cout << "  TYPE: " << to_uint(FixedSizeIndex::TYPE) << std::endl;
+		std::cout << "  ID_0: " << to_uint(FixedSizeIndex::ID_0) << std::endl;
+		std::cout << "  DLC: " << to_uint(FixedSizeIndex::DLC) << std::endl;
+		std::cout << "  DATA_0: " << to_uint(FixedSizeIndex::DATA_0) << std::endl;
+		std::cout << "  CHECKSUM: " << to_uint(FixedSizeIndex::CHECKSUM) << std::endl;
+
+		std::cout << "\nVariable Frame Indices:" << std::endl;
+		std::cout << "  START: " << to_uint(VarSizeIndex::START) << std::endl;
+		std::cout << "  TYPE_HEADER: " << to_uint(VarSizeIndex::TYPE_HEADER) << std::endl;
+		std::cout << "  ID_START: " << to_uint(VarSizeIndex::ID_START) << std::endl;
+
+		// Test VarSizeIndex arithmetic
+		VarSizeIndex test_idx = VarSizeIndex::ID_START + 2;
+		std::cout << "  ID_START + 2: " << to_uint(test_idx) << std::endl;
+
+	} catch (const std::exception& e) {
+		std::cerr << "Error: " << e.what() << std::endl;
+		return 1;
 	}
-	printf("\n");
+
+	std::cout << "\n=== Demo completed successfully ===" << std::endl;
 	return 0;
-
 }
-

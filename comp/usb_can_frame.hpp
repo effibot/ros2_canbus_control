@@ -44,7 +44,8 @@
 namespace USBCANBridge
 {
 #pragma pack(push, 1)
-// Base frame structure
+
+//* Base frame structure
 struct baseFrame {
 	/**
 	 * @brief USB-CAN-A adapter base frame structure
@@ -80,10 +81,10 @@ struct baseFrame {
 	virtual void fill(uint8_t value) = 0;
 	virtual std::size_t size() const = 0;
 	virtual void setData(const std::vector<uint8_t>& new_data) = 0;
-	virtual void setData(FixedSizeIndex index, uint8_t value) = 0;
+	virtual void setData(size_t index, uint8_t value) = 0;
 	virtual std::vector<uint8_t> getData() const = 0;
-	virtual uint8_t getData(FixedSizeIndex index) const = 0;
-	virtual const bool inDataRange(FixedSizeIndex index) const = 0;
+	virtual uint8_t getData(size_t index) const = 0;
+	virtual bool inDataRange(size_t index) const = 0;
 
 	// Protocol Handling
 	virtual void setType(Type type) = 0;
@@ -105,7 +106,7 @@ struct baseFrame {
 	virtual bool isValidFrame() const = 0;
 };
 
-// Fixed Frame structure (20 bytes)
+//* Fixed Frame structure (20 bytes)
 struct fixedSize : public baseFrame {
 	/**
 	 * @brief USB-CAN-A adapter 20-byte fixed frame structure
@@ -209,7 +210,7 @@ struct fixedSize : public baseFrame {
 	const uint8_t& at(std::size_t index) const override {
 		return this->operator[](index);
 	}
-	const bool inDataRange(FixedSizeIndex index) const override {
+	bool inDataRange(size_t index) const override {
 		/**
 		 * @brief Check if the index is in the valid data range
 		 * This method checks if the provided index is within the valid range for
@@ -218,7 +219,7 @@ struct fixedSize : public baseFrame {
 		 * @param index The index to check
 		 * @return true if index is valid, false otherwise
 		 */
-		if (index < FixedSizeIndex::DATA_0 || index > FixedSizeIndex::DATA_7) {
+		if (index > 7) {
 			return false;
 		}
 		return true;
@@ -277,31 +278,31 @@ struct fixedSize : public baseFrame {
 		 */
 		return std::vector<uint8_t>(data.begin(), data.end());
 	}
-	void setData(FixedSizeIndex index, uint8_t value) override {
+	void setData(size_t index, uint8_t value) override {
 		/**
 		 * @brief Set a specific data byte by index
 		 * This method allows setting a specific byte in the data array.
 		 * It performs bounds checking to ensure the index is valid, but does not
 		 * check the value being set. This means that any byte value (0-255) can be set.
-		 * @param index The index of the byte to set (0-16)
+		 * @param index The index of the {data} field byte to set (0-7)
 		 * @param value The value to set at the specified index
 		 * @throws std::out_of_range if index is out of bounds
 		 * @note The index is zero-based, so valid indices are 0 to 16
 		 * @note Call this function only if you are sure about the value being set
 		 */
 		if (!inDataRange(index)) {
-			std::string msg = "Index " + std::to_string(to_uint(index)) + " is out of range for Waveshare fixedSize data [10-17]";
+			std::string msg = "Index " + std::to_string(index) + " is out of range for Waveshare fixedSize data [0-7]";
 			throw std::out_of_range(msg);
 		}
 		// Set the data byte at the specified index
-		data.at(to_uint(index)-10) = value;
+		data.at(index) = value;
 	}
-	uint8_t getData(FixedSizeIndex index) const override {
+	uint8_t getData(size_t index) const override {
 		/**
 		 * @brief Get a specific data byte by index
 		 * This method allows retrieving a specific byte from the data array.
 		 * It performs bounds checking to ensure the index is valid.
-		 * @param index The index of the byte to retrieve (0-16)
+		 * @param index The index of the byte to retrieve (0-7)
 		 * @return The value of the byte at the specified index
 		 * @throws std::out_of_range if index is out of bounds
 		 * @note The index is zero-based, so valid indices are 0 to 16
@@ -309,10 +310,10 @@ struct fixedSize : public baseFrame {
 		 * @return The byte value at the specified index
 		 */
 		if (!inDataRange(index)) {
-			std::string msg = "Index " + std::to_string(to_uint(index)) + " is out of range for Waveshare fixedSize data [10-17]";
+			std::string msg = "Index " + std::to_string(index) + " is out of range for Waveshare fixedSize data [0-7]";
 			throw std::out_of_range(msg);
 		}
-		return data.at(to_uint(index)-10);
+		return data.at(index);
 	}
 	void setType(Type type) override {
 		/**
@@ -679,7 +680,8 @@ invalid:
 
 
 };
-// Variable Length Frame structure
+
+//* Variable Length Frame structure
 struct varSize : public baseFrame
 {
 	/**
@@ -697,18 +699,40 @@ struct varSize : public baseFrame
 	 * - [2] Frame ID [2 or 4] bytes, little-endian
 	 * - [3] Frame Data [0-8] bytes
 	 * - [4] End byte (always {0x55})
+	 * To construct the type byte, use the make_variable_type_byte() utility function.
+	 * However, to be more flexible, we implement the type, id, and data as separate members.
+	 * This allows modifying the frame more easily without needing to recalculate the type byte
+	 * every time a field is changed.
+	 * @see make_variable_type_byte() for constructing the type byte
+	 * @see usb_can_common.hpp for details on frame format
 	 * @note This variable length frame format is more flexible and is used as default in this implementation
 	 */
-	uint8_t type; // Type byte
+
+	const uint8_t type_header = to_uint8(Type::DATA_VAR); // Type Header byte - always 0xC0 (bits 7 and 6 set to 1)
+	uint8_t frame_type;
+	uint8_t frame_fmt;
+	uint8_t dlc;               // Data Length Code (0-8)
 	std::vector<uint8_t> id;   // ID bytes (2 or 4 bytes, little-endian)
 	std::vector<uint8_t> data; // Data bytes (0-8 bytes)
 	const uint8_t end_byte = to_uint8(Constants::END_BYTE); // End byte (0x55)
 	// the next are utility variables to help with size calculations
-	uint ID_END, DATA_START, DATA_END, END = 0;
+	VarSizeIndex ID_END = static_cast<VarSizeIndex>(0);
+	VarSizeIndex DATA_START = static_cast<VarSizeIndex>(0);
+	VarSizeIndex DATA_END = static_cast<VarSizeIndex>(0);
+	VarSizeIndex FRAME_END = static_cast<VarSizeIndex>(0);
 
 
+	// Default constructor
+	//! DO NOT USE THIS, use the parameterized constructor instead
 	varSize() : baseFrame(),
+		type_header(to_uint8(Type::DATA_VAR)),
 		end_byte(to_uint8(Constants::END_BYTE)) {
+		// Default to standard data frame with 0 DLC
+		frame_type = 0; // Standard frame
+		frame_fmt = 0;  // Data frame
+		dlc = 0;        // No data
+		id.resize(2, 0);   // Standard ID (2 bytes)
+		data.resize(0, 0); // No data
 	}
 	~varSize() = default;
 
@@ -716,8 +740,8 @@ struct varSize : public baseFrame
 	explicit varSize(FrameType frame_type, FrameFmt frame_fmt, uint8_t dlc) : baseFrame(),
 		end_byte(to_uint8(Constants::END_BYTE)) {
 
-		this->type = make_variable_type_byte(frame_type, frame_fmt, dlc);
-		// Initialize ID and Data vectors based on frame type and DLC
+		// Validate the type frame and format while constructing
+		// and initializing ID and Data vectors based on frame type and DLC
 		if (frame_type == FrameType::STD_VAR) {
 			id.resize(2, 0); // Standard ID (2 bytes)
 		} else if (frame_type == FrameType::EXT_VAR) {
@@ -725,39 +749,70 @@ struct varSize : public baseFrame
 		} else {
 			throw std::invalid_argument("Invalid frame type for varSize constructor");
 		}
+		this->frame_type = to_uint8(frame_type);
+		if (frame_fmt == FrameFmt::DATA_VAR) {
+			this->frame_fmt = to_uint8(FrameFmt::DATA_VAR); // Data frame
+		} else if (frame_fmt == FrameFmt::REMOTE_VAR) {
+			this->frame_fmt = to_uint8(FrameFmt::REMOTE_VAR); // Remote frame
+		} else {
+			throw std::invalid_argument("Invalid frame format for varSize constructor");
+		}
+		this->frame_fmt = to_uint8(frame_fmt);
+		// Validate and set DLC
 		if (dlc > 8) {
 			throw std::invalid_argument("DLC must be 0-8 for CAN frames");
 		}
+		this->dlc = dlc;        // Set DLC
+		// Initialize data vector based on DLC
 		data.resize(dlc, 0); // Data bytes (0-8 bytes)
+		// Update utility indices and dlc
+		updateIndices();
+	}
 
-		// Calculate utility indices
-		ID_END = 2 + id.size() - 1;
-		DATA_START = ID_END + 1;
-		DATA_END = DATA_START + data.size() - 1;
-		END = DATA_END + 1;
+	// Out of range exception handling
+	bool isValidIndex(std::size_t index) const {
+		if (index >= FRAME_END && index > 0) {
+			std::string msg = "Index " + std::to_string(index) +
+			                  " is out of range for Waveshare varSize frame (0-" +
+			                  std::to_string(to_uint(FRAME_END)) + ")";
+			throw std::out_of_range(msg);
+		}
+		return true;
 	}
 
 	// Operators
 	uint8_t& operator[](std::size_t index) override {
-		if (index > END) {
-			std::string msg = "Index " + std::to_string(index) +
-			                  " is out of range for Waveshare varSize frame (0-" +
-			                  std::to_string(END) + ")";
-			throw std::out_of_range(msg);
-		}
+		/**
+		 * @brief Access frame bytes by index
+		 * This method allows accessing individual bytes of the frame by index.
+		 * It performs bounds checking to ensure the index is valid.
+		 * @param index The index of the byte to access (0 to FRAME_END)
+		 * @return A reference to the byte at the specified index
+		 * @throws std::out_of_range if index is out of bounds
+		 * @note The index is zero-based, so valid indices are 0 to FRAME_END
+		 */
+		// Validate index
+		isValidIndex(index);
 
+		// Map index to the correct member
 		switch (index) {
 		case 0:
 			return const_cast<uint8_t&>(start_byte);
 		case 1:
-			return type;
+			return const_cast<uint8_t&>(type_header); // Type header is always 0xC0
+		case 2:
+			return frame_type;
+		case 3:
+			return frame_fmt;
+		case 4:
+			return dlc;
 		default:
 			// Handle variable ranges with if-chain
 			if (index < DATA_START) {
 				return id[index - 2];
 			}
-			if (index < END) {
-				return data[index - DATA_START];
+			if (index < FRAME_END) {
+				return data[index - to_uint(DATA_START)];
 			}
 			return const_cast<uint8_t&>(end_byte);
 		}
@@ -766,23 +821,30 @@ struct varSize : public baseFrame
 	const uint8_t& operator[](std::size_t index) const override {
 		return const_cast<varSize*>(this)->operator[](index);
 	}
+
+	uint8_t& operator[](VarSizeIndex index) {
+		return this->operator[](to_uint(index));
+	}
+
+	const uint8_t& operator[](VarSizeIndex index) const {
+		return const_cast<varSize*>(this)->operator[](to_uint(index));
+	}
+
 	uint8_t& at(std::size_t index) override {
-		if (index >= END) {
-			std::string msg = "Index " + std::to_string(index) +
-			                  " is out of range for Waveshare varSize frame (0-" +
-			                  std::to_string(END) + ")";
-			throw std::out_of_range(msg);
-		}
+		/**
+		 * @brief Access frame bytes by index with bounds checking
+		 * This method allows accessing individual bytes of the frame by index,
+		 * with bounds checking to ensure the index is valid.
+		 * @param index The index of the byte to access (0 to FRAME_END)
+		 * @return A reference to the byte at the specified index
+		 * @throws std::out_of_range if index is out of bounds
+		 * @note The index is zero-based, so valid indices are 0 to FRAME_END
+		 */
+		isValidIndex(index);
 		return this->operator[](index);
 	}
 	const uint8_t& at(std::size_t index) const override {
-		if (index >= END) {
-			std::string msg = "Index " + std::to_string(index) +
-			                  " is out of range for Waveshare varSize frame (0-" +
-			                  std::to_string(END) + ")";
-			throw std::out_of_range(msg);
-		}
-		return this->operator[](index);
+		return const_cast<varSize*>(this)->at(index);
 	}
 
 	// Interface for Internal data manipulation
@@ -790,20 +852,66 @@ struct varSize : public baseFrame
 		return &this->operator[](0);
 	}
 	uint8_t* end() override {
-		return &this->operator[](END + 1);
+		return &this->operator[](FRAME_END + 1);
 	}
 	const uint8_t* begin() const override {
 		return &this->operator[](0);
 	}
 	const uint8_t* end() const override {
-		return &this->operator[](END + 1);
+		return &this->operator[](FRAME_END + 1);
 	}
 	void fill(uint8_t value) override {
 		std::fill(this->begin(), this->end(), value);
 	}
 	std::size_t size() const override {
-		return END + 1;
+		/**
+		 * @brief Get the size of the variable size frame
+		 * This method returns the size of the variable size frame in bytes.
+		 * The size is calculated based on the current ID and data sizes.
+		 * @return The size of the frame in bytes
+		 * @note The size includes the start byte, type byte, ID bytes, data bytes, and end byte
+		 * @note The size is always between 6 and 15 bytes
+		 */
+		size_t constants_size = 1 /* start byte */ + 1 /* type byte */ + 1 /* end byte */;
+		// ID size is either 2 or 4 bytes based on frame type
+		size_t id_size = id.size();
+		size_t data_size = data.size();
+		return constants_size + id_size + data_size; // Total size
 	}
+
+	// Utility functions to update indices after data modification
+	void updateDLC() {
+		/**
+		 * @brief Update the DLC in the type byte based on current data size
+		 * This method recalculates the DLC bits in the type byte based on the
+		 * current size of the data vector. It should be called whenever the
+		 * data size is modified.
+		 * @note This function does not perform any validation on the data size.
+		 */
+		uint8_t dlc = static_cast<uint8_t>(data.size() & 0x0F); // DLC is 4 bits
+		setDLC(dlc); // Clear lower 4 bits and set new DLC
+	}
+
+	void updateIndices() {
+		/**
+		 * @brief Update utility indices based on current ID and data sizes
+		 * This method recalculates the utility indices used for accessing
+		 * different parts of the variable size frame. It should be called
+		 * whenever the ID or data sizes are modified.
+		 * ! Since in this implementation we decompose the type byte into separate members,
+		 * ! we need to shift back by 3 positions the indices, starting from ID_START
+		 * ! because the type byte is now split into 4 separate bytes (type_header, frame_type, frame_fmt, dlc)
+		 * ! instead of being a single byte.
+		 * @note This function does not perform any validation on the ID or data sizes.
+		 */
+		updateDLC(); // Ensure DLC is updated first
+		// Recalculate indices
+		ID_END = VarSizeIndex::ID_START + id.size() - 3; // 5 + id.size() - 3
+		DATA_START = ID_END + 1;               // ID_END + 1
+		DATA_END = DATA_START + data.size() - 1; // DATA_START + data.size() - 1
+		FRAME_END = DATA_END + 1;              // DATA_END + 1
+	}
+
 	void setData(const std::vector<uint8_t>& new_data) override {
 		/**
 		 * @brief Set the data bytes of the frame
@@ -827,37 +935,454 @@ struct varSize : public baseFrame
 		std::copy(new_data.begin(), new_data.begin() + bytes_to_copy, data.begin());
 		//! No need to zero out remaining bytes, as data vector is resized to fit new_data exactly
 		//! and the protocol has variable length data field
-		// Update utility indices
-		DATA_END = DATA_START + data.size() - 1;
-		END = DATA_END + 1;
-		// Update type byte to reflect new DLC
-		uint8_t dlc = static_cast<uint8_t>(data.size());
-		setDLC(dlc);
+		// Update indices and DLC
+		updateIndices();
 	}
-	// TODO
-	virtual void setData(FixedSizeIndex index, uint8_t value) = 0;
-	virtual std::vector<uint8_t> getData() const = 0;
-	virtual uint8_t getData(FixedSizeIndex index) const = 0;
-	virtual const bool inDataRange(FixedSizeIndex index) const = 0;
+
+	void setData(size_t index, uint8_t value) override {
+		/**
+		 * @brief Set a specific data byte by index
+		 * This method allows setting a specific byte in the data array.
+		 * It performs bounds checking to ensure the index is valid, but does not
+		 * check the value being set. This means that any byte value (0-255) can be set.
+		 * @param index The index of the byte to set (0-7)
+		 * @param value The value to set at the specified index
+		 * @throws std::out_of_range if index is out of bounds
+		 * @note The index is zero-based, so valid indices are 0 to 7
+		 * @note Call this function only if you are sure about the value being set
+		 */
+
+		// Bounds check
+		if (!inDataRange(index)) {
+			std::string msg = "Index " + std::to_string(index) + " is out of range for Waveshare varSize data [0-7]";
+			throw std::out_of_range(msg);
+		}
+		// Index is inside DATA_START to DATA_END range, update to specific memory location
+		data.at(index) = value;
+	}
+	std::vector<uint8_t> getData() const override {
+		/**
+		 * @brief Get the data bytes of the frame
+		 * This method returns the data bytes of the frame as a vector.
+		 * It provides a safe way to access the internal data array.
+		 * @return A vector containing the data bytes
+		 */
+		return data;
+	}
+	uint8_t getData(size_t index) const override {
+		/**
+		 * @brief Get a specific data byte by index
+		 * This method allows retrieving a specific byte from the data array.
+		 * It performs bounds checking to ensure the index is valid.
+		 * @param index The index of the byte to retrieve (0-7)
+		 * @return The value of the byte at the specified index
+		 * @throws std::out_of_range if index is out of bounds
+		 * @note The index is zero-based, so valid indices are 0 to 7
+		 * @note This function provides safe access to the internal data array
+		 * @return The byte value at the specified index
+		 */
+		if (!inDataRange(index)) {
+			std::string msg = "Index " + std::to_string(index) + " is out of range for Waveshare varSize data [0-7]";
+			throw std::out_of_range(msg);
+		}
+		return data.at(index);
+	}
+	bool inDataRange(size_t index) const override {
+		/**
+		 * @brief Check if index is within valid data range
+		 * This method checks if the provided index is within the valid range
+		 * for accessing data bytes in the variable size frame.
+		 * Valid indices are from DATA_START to DATA_END (inclusive) corresponding to data[0] to data[7].
+		 * @param index The index to check
+		 * @return true if index is valid, false otherwise
+		 */
+		if (index >= data.size()) {
+			return false;
+		}
+		return true;
+	}
 
 	// Protocol Handling
-	virtual void setType(Type type) = 0;
-	virtual Type getType() const = 0;
-	virtual void setFrameType(FrameType frame_type) = 0;
-	virtual FrameType getFrameType() const = 0;
-	virtual void setFrameFmt(FrameFmt frame_fmt) = 0;
-	virtual FrameFmt getFrameFmt() const = 0;
-	virtual void setDLC(uint8_t dlc) = 0;
-	virtual uint8_t getDLC() const = 0;
-	virtual bool isValidLength() const = 0;
-	virtual void setID(uint32_t id) = 0;
-	virtual uint32_t getID() const = 0;
-	virtual std::vector<uint8_t> getIDBytes() const = 0;
-	virtual void setIDBytes(const std::vector<uint8_t>& id_bytes) = 0;
-	virtual bool isValidID() const = 0;
-	virtual std::vector<uint8_t> serialize() const = 0;
-	virtual bool deserialize(const std::vector<uint8_t>& data) = 0;
-	virtual bool isValidFrame() const = 0;
+	void setType(Type type) override {
+		/**
+		 * @brief Set the packet type byte in the data array
+		 * For the variable size frame, the type byte a composition of:
+		 * - [Type header] bit 6-7: Always 0xC0 (bits 7 and 6 set to 1)
+		 * - [Frame Type] bit 5: 0 for standard frame (2 bytes ID), 1 for extended frame (4 bytes ID)
+		 * - [Frame Format] bit 4: 0 for data frame, 1 for remote frame
+		 * - [DLC] bits 3-0: Data Length Code (0-8)
+		 * However, for implementation flexibility, we store the type, frame_type, frame_fmt, and dlc
+		 * as separate member variables. This allows modifying the frame more easily without needing to
+		 * recalculate the type byte every time a field is changed.
+		 * ! To avoid confusion, this function only throws compile-time error if type is not DATA_VAR
+		 * ! as this is the only valid type for variable size frames.
+		 * @see usb_can_common.hpp for details on frame format
+		 * @param type The packet type byte to set
+		 * @throws std::invalid_argument if type is not DATA_VAR (0xC0)
+		 */
+		if (type != Type::DATA_VAR) {
+			std::string msg = "Invalid packet type for varSize frame: " +
+			                  std::to_string(to_uint8(type)) +
+			                  ". Must be " +
+			                  std::to_string(to_uint8(Type::DATA_VAR)) + " (variable length data frame)";
+			throw std::invalid_argument(msg);
+		}
+		return; // Type is always DATA_VAR for varSize frames
+	}
+
+	Type getType() const override {
+		/**
+		 * @brief Get the packet type byte.
+		 * The packet type is stored in the {type_header} member variable and can be either
+		 * 0x01 (data) or 0x02 (configuration).
+		 * @return Packet type byte
+		 */
+		return static_cast<Type>(type_header);
+	}
+	void setFrameType(FrameType frame_type) override {
+		/**
+		 * @brief Set the frame type byte in the data array
+		 * @see usb_can_common.hpp for details on frame format
+		 * @param frame_type The frame type byte to set
+		 * @throws std::invalid_argument if frame_type is not 0x01 or 0x02
+		 */
+		if (frame_type != FrameType::STD_VAR &&
+		    frame_type != FrameType::EXT_VAR) {
+			std::string msg = "Invalid frame type: " +
+			                  std::to_string(to_uint8(frame_type)) +
+			                  ". Must be " +
+			                  std::to_string(to_uint8(FrameType::STD_VAR)) + " (standard) or " +
+			                  std::to_string(to_uint8(FrameType::EXT_VAR)) + " (extended)";
+			throw std::invalid_argument(msg);
+		}
+		this->frame_type = to_uint8(frame_type);
+	}
+	FrameType getFrameType() const override {
+		/**
+		 * @brief Get the frame type from the data array
+		 * Frame type is stored in the {frame_type} member variable and can be either
+		 * 0x01 (standard) or 0x02 (extended).
+		 * @see usb_can_common.hpp for details on frame format
+		 * @return Frame type byte
+		 */
+		return static_cast<FrameType>(frame_type);
+	}
+	void setFrameFmt(FrameFmt frame_fmt) override {
+		/**
+		 * @brief Set the frame format byte in the data array
+		 * @see usb_can_common.hpp for details on frame format
+		 * @param frame_fmt The frame format byte to set
+		 * @throws std::invalid_argument if frame_fmt is not 0x01 or 0x02
+		 */
+		if (frame_fmt != FrameFmt::DATA_VAR &&
+		    frame_fmt != FrameFmt::REMOTE_VAR) {
+			std::string msg = "Invalid frame format: " +
+			                  std::to_string(to_uint8(frame_fmt)) +
+			                  ". Must be " +
+			                  std::to_string(to_uint8(FrameFmt::DATA_VAR)) + " (data) or " +
+			                  std::to_string(to_uint8(FrameFmt::REMOTE_VAR)) + " (remote)";
+			throw std::invalid_argument(msg);
+		}
+		this->frame_fmt = to_uint8(frame_fmt);
+	}
+	FrameFmt getFrameFmt() const override {
+		/**
+		 * @brief Get the frame format from the data array
+		 * Frame format is stored in the {frame_fmt} member variable and can be either
+		 * 0x01 (data frame) or 0x02 (remote frame).
+		 * @see usb_can_common.hpp for details on frame format
+		 * @return Frame format byte
+		 */
+		return static_cast<FrameFmt>(frame_fmt);
+	}
+	void setDLC(uint8_t dlc) override {
+		/**
+		 * @brief Set the Data Length Code (DLC) in the type byte
+		 * The DLC is stored in the lower 4 bits of the {type} field and must be in the range 0 to 8 for CAN frames.
+		 * @see usb_can_common.hpp for details on frame format
+		 * @param dlc The DLC value to set (0-8)
+		 * @throws std::invalid_argument if dlc is not in the range 0-8
+		 * @note This function does not resize the data vector, it only updates the DLC bits in the type byte
+		 * @note If you want to change the actual data size, use setData() method instead
+		 */
+		if (dlc > 8) {
+			throw std::invalid_argument("DLC must be 0-8 for CAN frames");
+		}
+		this->dlc = dlc;
+		//! Here we don't resize data vector, as it may lead to data loss
+		//! If you want to change data size, use setData() method instead
+	}
+	uint8_t getDLC() const override {
+		/**
+		 * @brief Get the Data Length Code (DLC) from the type byte
+		 * The DLC is stored in the lower 4 bits of the {type} field and must be in the range 0 to 8 for CAN frames.
+		 * @see usb_can_common.hpp for details on frame format
+		 * @return The DLC value (0-8)
+		 */
+		return dlc;
+	}
+	bool isValidLength() const override {
+		/**
+		 * @brief Validate the Data Length Code (DLC)
+		 * This method checks if the DLC is valid for CAN frames.
+		 * The DLC must be in the range 0 to 8.
+		 * @return true if the DLC is valid, false otherwise
+		 * @note This function does not check if the data bytes are correctly set,
+		 *       only if the DLC value is within the valid range for CAN frames
+		 */
+		uint8_t dlc = getDLC();
+		return dlc <= 8;
+	}
+	void setID(uint32_t id) override {
+		/**
+		 * @brief Set the CAN ID in the data array, converting an integer to bytes
+		 * This method sets the CAN ID in the data array, converting a 32-bit unsigned
+		 * integer to the appropriate little-endian byte representation.
+		 * For standard frames, the lower (firsts) two bytes are used,
+		 * and the upper (seconds) two bytes are zeroed out.
+		 * For extended frames, all four bytes are used.
+		 * @param id The CAN ID value to set as a 32-bit unsigned integer
+		 * @throws std::invalid_argument if id is out of range
+		 * @note The ID is stored in little-endian format
+		 * @note Call this function only if you are sure about the ID being set
+		 */
+		const FrameType frame_type = getFrameType();
+
+		// Validate ID range based on frame type
+		if (frame_type == FrameType::STD_VAR) {
+			if (id > 0x7FF) {
+				throw std::invalid_argument("Standard ID must be in range 0 to 2047 (0x7FF)");
+			}
+			// Resize ID vector to 2 bytes for standard frame
+			if (this->id.size() != 2)
+				this->id.resize(2, 0);
+			// Convert to little-endian byte representation (2 bytes)
+			this->id[0] = static_cast<uint8_t>(id & 0xFF);
+			this->id[1] = static_cast<uint8_t>((id >> 8) & 0xFF);
+		} else if (frame_type == FrameType::EXT_VAR) {
+			if (id > 0x1FFFFFFF) {
+				throw std::invalid_argument("Extended ID must be in range 0 to 536870911 (0x1FFFFFFF)");
+			}
+			// Resize ID vector to 4 bytes for extended frame
+			if (this->id.size() != 4)
+				this->id.resize(4, 0);
+			// Convert to little-endian byte representation (4 bytes)
+			this->id[0] = static_cast<uint8_t>(id & 0xFF);
+			this->id[1] = static_cast<uint8_t>((id >> 8) & 0xFF);
+			this->id[2] = static_cast<uint8_t>((id >> 16) & 0xFF);
+			this->id[3] = static_cast<uint8_t>((id >> 24) & 0xFF);
+		} else {
+			throw std::invalid_argument("Invalid frame type for setting ID");
+		}
+	}
+
+	uint32_t getID() const override {
+		/**
+		 * @brief Get the CAN ID from the data array, converting bytes to an integer
+		 * This method retrieves the CAN ID from the data array, converting the
+		 * little-endian byte representation to a 32-bit unsigned integer.
+		 * For standard frames, only the lower (firsts) two bytes are used,
+		 * and the upper (seconds) two bytes are ignored.
+		 * @return The CAN ID value as a 32-bit unsigned integer
+		 * @note The ID is stored in little-endian format
+		 */
+		uint32_t id_value = 0;
+		if (id.size() >= 2) {
+			id_value |= static_cast<uint32_t>(id[0]);
+			id_value |= static_cast<uint32_t>(id[1]) << 8;
+		}
+		if (id.size() == 4) {
+			id_value |= static_cast<uint32_t>(id[2]) << 16;
+			id_value |= static_cast<uint32_t>(id[3]) << 24;
+		}
+		return id_value;
+	}
+	std::vector<uint8_t> getIDBytes() const override {
+		/**
+		 * @brief Get the CAN ID bytes from the data array
+		 * This method returns the CAN ID bytes from the data array as a vector.
+		 * It provides a safe way to access the internal ID array.
+		 * @return A vector containing the ID bytes
+		 * @note The ID is stored in little-endian format
+		 */
+		return id;
+	}
+	void setIDBytes(const std::vector<uint8_t>& id_bytes) override {
+		/**
+		 * @brief Set the CAN ID bytes in the data array
+		 * This method sets the CAN ID bytes in the data array from a vector.
+		 * It ensures that the ID size matches the expected size based on frame type.
+		 * For standard frames, the ID size must be exactly 2 bytes.
+		 * For extended frames, the ID size must be exactly 4 bytes.
+		 * @param id_bytes A vector containing the ID bytes to set
+		 * @throws std::invalid_argument if id_bytes size does not match expected size
+		 * @note The ID is stored in little-endian format
+		 * @note Call this function only if you are sure about the ID being set
+		 */
+		const FrameType frame_type = getFrameType();
+		if (frame_type == FrameType::STD_VAR) {
+			if (id_bytes.size() != 2) {
+				throw std::invalid_argument("ID must be exactly 2 bytes for standard frame");
+			}
+		} else if (frame_type == FrameType::EXT_VAR) {
+			if (id_bytes.size() != 4) {
+				throw std::invalid_argument("ID must be exactly 4 bytes for extended frame");
+			}
+		} else {
+			throw std::invalid_argument("Invalid frame type for setting ID bytes");
+		}
+		// Set the ID bytes
+		id = id_bytes;
+	}
+	bool isValidID() const {
+		/**
+		 * @brief Validate the CAN ID based on frame type
+		 * This method checks if the CAN ID is valid based on the frame type.
+		 * For standard frames, the ID must be in the range 0 to 2047 (0x7FF).
+		 * For extended frames, the ID must be in the range 0 to 536870911 (0x1FFFFFFF).
+		 * @return true if the ID is valid, false otherwise
+		 * @note This function does not check if the ID bytes are correctly set,
+		 *       only if the ID value is within the valid range for the frame type
+		 */
+		const FrameType frame_type = getFrameType();
+		const uint32_t id_value = getID();
+		if (frame_type == FrameType::STD_VAR) {
+			return id_value <= 0x7FF;
+		} else if (frame_type == FrameType::EXT_VAR) {
+			return id_value <= 0x1FFFFFFF;
+		}
+		return false; // Invalid frame type
+	}
+	std::vector<uint8_t> serialize() const override {
+		/**
+		 * @brief Serialize the variable size frame to a byte vector
+		 * This method serializes the variable size frame into a byte vector,
+		 * including the start byte, type byte, ID bytes, data bytes, and end byte.
+		 * It ensures that the frame is valid before serialization.
+		 * ! At low level, the protocol states that the type byte is an aggregate of
+		 * ! frame_header, frame_type, frame_fmt, and dlc. To compute this aggregate,
+		 * ! use the make_variable_type_byte() utility function.
+		 * @return A vector containing the serialized frame bytes
+		 * @throws std::invalid_argument if the frame is not valid
+		 * @note The serialized frame length varies based on ID and data sizes
+		 * @note The end byte is always included at the end of the serialized frame
+		 */
+		// Allocate vector with exact size
+		std::vector<uint8_t> result;
+		result.reserve(size());
+		result.push_back(start_byte);
+		// Construct type byte from individual components
+		uint8_t type_byte = make_variable_type_byte(getFrameType(), getFrameFmt(), getDLC());
+		result.push_back(type_byte);
+		// Append ID and Data bytes
+		result.insert(result.end(), id.begin(), id.end());
+		result.insert(result.end(), data.begin(), data.end());
+		result.push_back(end_byte);
+		// Ensure the frame is valid before serialization
+		if (!isValidFrame()) {
+			throw std::invalid_argument("Cannot serialize an invalid frame");
+		}
+		return result;
+	}
+	bool deserialize(const std::vector<uint8_t>& data) override {
+		/**
+		 * @brief Deserialize a byte vector into the variable size frame
+		 * This method deserializes a byte vector into the variable size frame,
+		 * extracting the start byte, type byte, ID bytes, data bytes, and end byte.
+		 * It ensures that the input data is valid and matches the expected format.
+		 * ! At low level, the protocol states that the type byte is an aggregate of
+		 * ! frame_header, frame_type, frame_fmt, and dlc. To extract these components,
+		 * ! use the parse_variable_type_byte() utility function.
+		 * @param data A vector containing the raw frame bytes to deserialize
+		 * @return true if deserialization is successful and the frame is valid, false otherwise
+		 * @note The input data length must be between 6 and 15 bytes
+		 * @note The end byte is always expected at the end of the input data
+		 */
+
+		// Validate input size
+		if (data.size() < 6 || data.size() > 15) {
+			return false; // Invalid size
+		}
+		// Validate start and end bytes
+		if (data[0] != to_uint8(Constants::START_BYTE) || data[data.size() - 1] != to_uint8(Constants::END_BYTE)) {
+			return false; // Invalid start or end byte
+		}
+		// Extract type byte and parse components
+		uint8_t type_byte = data[1];
+		FrameType ft;
+		FrameFmt ff;
+		uint8_t dlc;
+		parse_variable_type_byte(type_byte, ft, ff, dlc);
+		// Set frame type, format, and DLC
+		try {
+			setFrameType(ft);
+			setFrameFmt(ff);
+			setDLC(dlc);
+		} catch (const std::invalid_argument&) {
+			return false; // Invalid type, format, or DLC
+		}
+		// Calculate expected sizes
+		size_t expected_id_size = (ft == FrameType::STD_VAR) ? 2 : 4;
+		size_t expected_data_size = dlc;
+		size_t expected_total_size = 1 /* start byte */ + 1 /* type byte */ +
+		                             expected_id_size + expected_data_size + 1 /* end byte */;
+		if (data.size() != expected_total_size) {
+			return false; // Size mismatch
+		}
+		// Extract the bytes for ID and Data
+		//! We have the dlc, so we can know what the data size is supposed to be
+		//! and we can update the indices accordingly
+		this->id.resize(expected_id_size);
+		this->data.resize(expected_data_size);
+		updateIndices(); // Update indices based on new sizes
+		// Copy ID bytes
+		std::copy(data.begin() + to_uint(VarSizeIndex::ID_START),
+		          data.begin() + to_uint(VarSizeIndex::ID_START) + expected_id_size,
+		          this->id.begin());
+		// Copy Data bytes
+		std::copy(data.begin() + to_uint(DATA_START),
+		          data.begin() + to_uint(DATA_START) + expected_data_size,
+		          this->data.begin());
+		return isValidFrame();
+	}
+	bool isValidFrame() const override {
+		/**
+		 * @brief Validate the entire variable size frame
+		 * This method checks if the entire variable size frame is valid.
+		 * It validates the start byte, type byte, ID bytes, data bytes, and end byte.
+		 * It also checks if the ID and DLC are valid based on the frame type.
+		 * @return true if the frame is valid, false otherwise
+		 * @note This function performs comprehensive validation of all frame components
+		 */
+		// Validate start and end bytes
+		if (start_byte != to_uint8(Constants::START_BYTE) || end_byte != to_uint8(Constants::END_BYTE)) {
+			return false;
+		}
+		// Validate type header
+		if (type_header != to_uint8(Type::DATA_VAR)) {
+			return false;
+		}
+		// Validate frame type and format
+		if (frame_type != to_uint8(FrameType::STD_VAR) && frame_type != to_uint8(FrameType::EXT_VAR)) {
+			return false;
+		}
+		if (frame_fmt != to_uint8(FrameFmt::DATA_VAR) && frame_fmt != to_uint8(FrameFmt::REMOTE_VAR)) {
+			return false;
+		}
+		// Validate DLC
+		if (!isValidLength()) {
+			return false;
+		}
+		// Validate ID based on frame type
+		if (!isValidID()) {
+			return false;
+		}
+		// Validate data size matches DLC
+		if (data.size() != dlc) {
+			return false;
+		}
+		return true; // All checks passed
+	}
 };
 #pragma pack(pop)
 
