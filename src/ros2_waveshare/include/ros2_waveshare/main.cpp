@@ -58,7 +58,7 @@ void testStandardFixedFrame() {
 		std::cout << "Created fixed frame with size: " << frame->size() << " bytes" << std::endl;
 
 		// Set CAN ID
-		frame->setID(0x123);
+		frame->setID(123);
 		std::cout << "Set CAN ID: 0x" << std::hex << frame->getID() << std::dec << std::endl;
 
 		// Set data
@@ -179,6 +179,7 @@ void testStandardVarFrame() {
 	} catch (const std::exception& e) {
 		std::cerr << "Error with variable frame: " << e.what() << std::endl;
 	}
+
 }
 
 void testExtendedVarFrame() {
@@ -206,14 +207,158 @@ void testExtendedVarFrame() {
 	printFrameData(serialized_ext);
 	printFrameData(buildRawVarFrame_ext());
 
-	uint8_t type_byte = 0xC0 + 1 + 0 + static_cast<uint8_t>(frame_ext->getDLC());
+	uint8_t type_byte = 0xC0 | (1 << 5) | (0 << 4) | 8; // Extended, Data frame, DLC=8
 	std::cout << "Constructed type byte: 0x" << std::hex << static_cast<int>(type_byte) << std::dec << std::endl;
+
+	FrameType ftype;
+	FrameFmt ffmt;
+	uint8_t dlc;
+	parse_variable_type_byte(type_byte, ftype, ffmt, dlc);
+	std::cout << "Parsed type byte - FrameType: " << (ftype == FrameType::EXT_VAR ? "EXT_VAR" : "STD_VAR")
+	          << ", FrameFmt: " << (ffmt == FrameFmt::DATA_VAR ? "DATA_VAR" : "REMOTE_VAR")
+	          << ", DLC: " << static_cast<int>(dlc) << std::endl;
+
+}
+
+// Test deserialization of raw data into frames
+void testDeserialization() {
+	std::cout << "\n=== Deserialization Tests ===" << std::endl;
+
+	// Test 1: Standard Fixed Frame Deserialization
+	std::cout << "\n--- Test 1: Standard Fixed Frame ---" << std::endl;
+	auto raw_std_fixed = buildRawFixedFrame();
+	printFrameData(raw_std_fixed);
+
+	try {
+		auto frame = FrameFactory::createFrameFromData(raw_std_fixed);
+		std::cout << "Deserialized frame type: " << (frame->getFrameType() == FrameType::STD_FIXED ? "STD_FIXED" : "OTHER") << std::endl;
+		std::cout << "CAN ID: 0x" << std::hex << frame->getID() << std::dec << std::endl;
+		std::cout << "DLC: " << static_cast<int>(frame->getDLC()) << std::endl;
+
+		auto data = frame->getData();
+		std::cout << "Data: ";
+		for (const auto& byte : data) {
+			std::cout << "0x" << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte) << " ";
+		}
+		std::cout << std::dec << std::endl;
+
+		// Verify expected values
+		bool id_correct = (frame->getID() == 0x123);
+		bool dlc_correct = (frame->getDLC() == 8);
+		std::vector<uint8_t> expected_data = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
+		bool data_correct = (data == expected_data);
+
+		std::cout << "Verification: ID=" << (id_correct ? "✓" : "✗")
+		          << ", DLC=" << (dlc_correct ? "✓" : "✗")
+		          << ", Data=" << (data_correct ? "✓" : "✗") << std::endl;
+
+	} catch (const std::exception& e) {
+		std::cerr << "Error deserializing standard fixed frame: " << e.what() << std::endl;
+	}
+
+	// Test 2: Extended Fixed Frame Deserialization
+	std::cout << "\n--- Test 2: Extended Fixed Frame ---" << std::endl;
+	auto raw_ext_fixed = buildRawFixedFrame_ext();
+	printFrameData(raw_ext_fixed);
+
+	try {
+		auto frame = FrameFactory::createFrameFromData(raw_ext_fixed);
+		std::cout << "Deserialized frame type: " << (frame->getFrameType() == FrameType::EXT_FIXED ? "EXT_FIXED" : "OTHER") << std::endl;
+		std::cout << "CAN ID: 0x" << std::hex << frame->getID() << std::dec << std::endl;
+		std::cout << "DLC: " << static_cast<int>(frame->getDLC()) << std::endl;
+
+		auto data = frame->getData();
+		std::cout << "Data: ";
+		for (const auto& byte : data) {
+			std::cout << "0x" << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte) << " ";
+		}
+		std::cout << std::dec << std::endl;
+
+		// Verify expected values
+		bool id_correct = (frame->getID() == 0x12345678);
+		bool dlc_correct = (frame->getDLC() == 8);
+		std::vector<uint8_t> expected_data = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+		bool data_correct = (data == expected_data);
+
+		std::cout << "Verification: ID=" << (id_correct ? "✓" : "✗")
+		          << ", DLC=" << (dlc_correct ? "✓" : "✗")
+		          << ", Data=" << (data_correct ? "✓" : "✗") << std::endl;
+
+	} catch (const std::exception& e) {
+		std::cerr << "Error deserializing extended fixed frame: " << e.what() << std::endl;
+	}
+
+	// Test 3: Standard Variable Frame Deserialization
+	std::cout << "\n--- Test 3: Standard Variable Frame ---" << std::endl;
+	auto raw_std_var = buildRawVarFrame();
+	printFrameData(raw_std_var);
+
+	try {
+		auto frame = FrameFactory::createFrameFromData(raw_std_var);
+		std::cout << "Deserialized frame type: " << (frame->getFrameType() == FrameType::STD_VAR ? "STD_VAR" : "OTHER") << std::endl;
+		std::cout << "CAN ID: 0x" << std::hex << frame->getID() << std::dec << std::endl;
+		std::cout << "DLC: " << static_cast<int>(frame->getDLC()) << std::endl;
+
+		auto data = frame->getData();
+		std::cout << "Data: ";
+		for (const auto& byte : data) {
+			std::cout << "0x" << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte) << " ";
+		}
+		std::cout << std::dec << std::endl;
+
+		// Verify expected values
+		bool id_correct = (frame->getID() == 0x123);
+		bool dlc_correct = (frame->getDLC() == 8);
+		std::vector<uint8_t> expected_data = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
+		bool data_correct = (data == expected_data);
+
+		std::cout << "Verification: ID=" << (id_correct ? "✓" : "✗")
+		          << ", DLC=" << (dlc_correct ? "✓" : "✗")
+		          << ", Data=" << (data_correct ? "✓" : "✗") << std::endl;
+
+	} catch (const std::exception& e) {
+		std::cerr << "Error deserializing standard variable frame: " << e.what() << std::endl;
+	}
+
+	// Test 4: Extended Variable Frame Deserialization
+	std::cout << "\n--- Test 4: Extended Variable Frame ---" << std::endl;
+	auto raw_ext_var = buildRawVarFrame_ext();
+	printFrameData(raw_ext_var);
+
+	try {
+		auto frame = FrameFactory::createFrameFromData(raw_ext_var);
+		std::cout << "Deserialized frame type: " << (frame->getFrameType() == FrameType::EXT_VAR ? "EXT_VAR" : "OTHER") << std::endl;
+		std::cout << "CAN ID: 0x" << std::hex << frame->getID() << std::dec << std::endl;
+		std::cout << "DLC: " << static_cast<int>(frame->getDLC()) << std::endl;
+
+		auto data = frame->getData();
+		std::cout << "Data: ";
+		for (const auto& byte : data) {
+			std::cout << "0x" << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte) << " ";
+		}
+		std::cout << std::dec << std::endl;
+
+		// Verify expected values
+		bool id_correct = (frame->getID() == 0x1234567);
+		bool dlc_correct = (frame->getDLC() == 8);
+		std::vector<uint8_t> expected_data = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
+		bool data_correct = (data == expected_data);
+
+		std::cout << "Verification: ID=" << (id_correct ? "✓" : "✗")
+		          << ", DLC=" << (dlc_correct ? "✓" : "✗")
+		          << ", Data=" << (data_correct ? "✓" : "✗") << std::endl;
+
+	} catch (const std::exception& e) {
+		std::cerr << "Error deserializing extended variable frame: " << e.what() << std::endl;
+	}
 }
 
 int main() {
-	// testStandardFixedFrame();
-	// testExtendedFixedFrame();
-	// testStandardVarFrame();
+	testStandardFixedFrame();
+	testExtendedFixedFrame();
+	testStandardVarFrame();
 	testExtendedVarFrame();
+
+	testDeserialization();
 	return 0;
 }

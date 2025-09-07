@@ -387,8 +387,8 @@ constexpr bool operator!=(std::size_t lhs, VarSizeIndex rhs) noexcept {
 	}
 
 	return to_uint8(Type::DATA_VAR) |
-	       (type == FrameType::STD_VAR ? to_uint8(FrameType::STD_VAR) : to_uint8(FrameType::EXT_VAR)) |
-	       (fmt == FrameFmt::DATA_VAR ? to_uint8(FrameFmt::DATA_VAR) : to_uint8(FrameFmt::REMOTE_VAR)) |
+	       ((type == FrameType::STD_VAR ? to_uint8(FrameType::STD_VAR) : to_uint8(FrameType::EXT_VAR)) << 5) |
+	       ((fmt == FrameFmt::DATA_VAR ? to_uint8(FrameFmt::DATA_VAR) : to_uint8(FrameFmt::REMOTE_VAR)) << 4) |
 	       (dlc & 0x0F);
 }
 

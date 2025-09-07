@@ -59,7 +59,13 @@ void validateIndex(std::size_t index) const {
 }
 
 public:
-// Constructor
+// Default Constructor
+//! this is needed for deserialization, don't use it directly
+VariableSizeFrame() : AdapterBaseFrame(),
+	type_header_(to_uint8(Type::DATA_VAR)),
+	end_byte_(to_uint8(Constants::END_BYTE)) {
+};
+// Constructor with parameters
 explicit VariableSizeFrame(FrameType frame_type, FrameFmt frame_fmt, uint8_t dlc)
 	: AdapterBaseFrame(),
 	type_header_(to_uint8(Type::DATA_VAR)),
@@ -93,19 +99,6 @@ explicit VariableSizeFrame(FrameType frame_type, FrameFmt frame_fmt, uint8_t dlc
 	// Initialize data vector based on DLC
 	data_.resize(dlc, 0);
 
-	updateIndices();
-}
-
-// Default constructor (discouraged - use parameterized constructor)
-VariableSizeFrame()
-	: AdapterBaseFrame(),
-	type_header_(to_uint8(Type::DATA_VAR)),
-	frame_type_(0),
-	frame_fmt_(0),
-	dlc_(0),
-	end_byte_(to_uint8(Constants::END_BYTE)) {
-	id_.resize(2, 0);
-	data_.resize(0, 0);
 	updateIndices();
 }
 

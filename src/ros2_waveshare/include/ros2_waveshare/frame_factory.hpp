@@ -57,16 +57,14 @@ static std::unique_ptr<AdapterBaseFrame> createFrameFromData(
 	// Determine frame type based on size and structure
 	if (raw_data.size() == 20 && raw_data[1] == to_uint8(Constants::MSG_HEADER)) {
 		// Fixed frame
-		auto frame = std::make_unique<FixedSizeFrame>(
-			Type::DATA_FIXED, FrameType::STD_FIXED, FrameFmt::DATA_FIXED);
+		auto frame = std::make_unique<FixedSizeFrame>();
 		if (frame->deserialize(raw_data)) {
 			return frame;
 		}
 	} else if (raw_data.size() >= 6 && raw_data.size() <= 15 &&
 	           raw_data[raw_data.size() - 1] == to_uint8(Constants::END_BYTE)) {
 		// Variable frame
-		auto frame = std::make_unique<VariableSizeFrame>(
-			FrameType::STD_VAR, FrameFmt::DATA_VAR, 0);
+		auto frame = std::make_unique<VariableSizeFrame>();
 		if (frame->deserialize(raw_data)) {
 			return frame;
 		}
@@ -74,6 +72,7 @@ static std::unique_ptr<AdapterBaseFrame> createFrameFromData(
 
 	throw std::invalid_argument("Unable to parse frame data");
 }
+
 };
 
 } // namespace USBCANBridge

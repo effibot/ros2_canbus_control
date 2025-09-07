@@ -19,6 +19,8 @@
 #include <algorithm>
 #include <stdexcept>
 #include <string>
+#include <iostream>
+#include <iomanip>
 
 namespace USBCANBridge
 {
@@ -62,7 +64,13 @@ void validateIndex(std::size_t index) const {
 }
 
 public:
-// Constructor
+// Default Constructor
+//! this is needed for deserialization, don't use it directly
+FixedSizeFrame() : AdapterBaseFrame(),
+	msg_header_(to_uint8(Constants::MSG_HEADER)),
+	reserved_(to_uint8(Constants::RESERVED0)) {
+};
+// Constructor with parameters
 explicit FixedSizeFrame(Type type, FrameType frame_type, FrameFmt fmt)
 	: AdapterBaseFrame(),
 	msg_header_(to_uint8(Constants::MSG_HEADER)),
@@ -374,14 +382,17 @@ bool deserialize(const std::vector<uint8_t>& raw_data) override {
 
 	if (raw_data[0] != start_byte_ || raw_data[1] != msg_header_) return false;
 
-	type_ = raw_data[2];
-	frame_type_ = raw_data[3];
-	frame_fmt_ = raw_data[4];
-	std::copy(raw_data.begin() + 5, raw_data.begin() + 9, id_bytes_.begin());
-	dlc_ = raw_data[9];
-	std::copy(raw_data.begin() + 10, raw_data.begin() + 18, data_.begin());
-	checksum_ = raw_data[19];
-
+	// Extract fields in known positions
+	type_ = raw_data[to_uint(FixedSizeIndex::TYPE)];
+	frame_type_ = raw_data[to_uint(FixedSizeIndex::FRAME_TYPE)];
+	frame_fmt_ = raw_data[to_uint(FixedSizeIndex::FRAME_FMT)];
+	dlc_ = raw_data[to_uint(FixedSizeIndex::DLC)];
+	checksum_ = raw_data[to_uint(FixedSizeIndex::CHECKSUM)];
+	// Extract values into arrays
+	//! copy() end_iterator is non-inclusive, so we need to stop at the next index
+	std::copy(raw_data.begin() + to_uint(FixedSizeIndex::ID_0), raw_data.begin() + to_uint(FixedSizeIndex::DLC), id_bytes_.begin());
+	std::cout << getID() << std::endl;
+	std::copy(raw_data.begin() + to_uint(FixedSizeIndex::DATA_0), raw_data.begin() + to_uint(FixedSizeIndex::RESERVED), data_.begin());
 	return isValidFrame();
 }
 };
