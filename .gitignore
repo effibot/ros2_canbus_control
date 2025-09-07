@@ -4,3 +4,8 @@ log/*
 site/*
 .vscode/browse*
 **/.vscode/browse*
+**/build/*
+**/install/*
+**/log/*
+**/site/*
+*.out

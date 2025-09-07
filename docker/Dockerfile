@@ -175,12 +175,15 @@ RUN apt update && apt install -y \
     ros-${ROS_DISTRO}-canopen* \
     ros-${ROS_DISTRO}-navigation2 \
     ros-${ROS_DISTRO}-nav2-bringup \
+    ros-${ROS_DISTRO}-ament-cmake-catch2 \
+    ros-${ROS_DISTRO}-catch-ros2 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies for the user
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt || true \
-    && rm /tmp/requirements.txt
+#! Environment is externally managed, so this step is commented out
+# COPY requirements.txt /tmp/requirements.txt
+# RUN pip install --no-cache-dir -r /tmp/requirements.txt || true \
+    # && rm /tmp/requirements.txt
 
 # Final cleanup
 RUN apt autoremove -y \
