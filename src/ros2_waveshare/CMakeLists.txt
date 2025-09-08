@@ -17,34 +17,41 @@ find_package(sensor_msgs REQUIRED)
 include_directories(include)
 
 # USB-CAN Driver Library
-add_library(usb_can_driver src/usb_can_driver.cpp)
+add_library(usb_can_driver 
+  src/usb_can_driver.cpp
+  src/fixed_size_frame.cpp
+  src/variable_size_frame.cpp
+  src/frame_factory.cpp)
 target_include_directories(usb_can_driver PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 ament_target_dependencies(usb_can_driver rclcpp)
 
-# SocketCAN Bridge Node
-add_executable(usb_can_socketcan_bridge src/usb_can_socketcan_bridge.cpp)
-target_link_libraries(usb_can_socketcan_bridge usb_can_driver)
-ament_target_dependencies(usb_can_socketcan_bridge 
-  rclcpp 
-  std_msgs
-  geometry_msgs)
+# SocketCAN Bridge Node (commented out - source file missing)
+# add_executable(usb_can_socketcan_bridge src/usb_can_socketcan_bridge.cpp)
+# target_link_libraries(usb_can_socketcan_bridge usb_can_driver)
+# ament_target_dependencies(usb_can_socketcan_bridge 
+#   rclcpp 
+#   std_msgs
+#   geometry_msgs)
 
-# Simple test nodes
-add_executable(can_frame_publisher src/can_frame_publisher.cpp)
-target_link_libraries(can_frame_publisher usb_can_driver)
-ament_target_dependencies(can_frame_publisher rclcpp std_msgs)
+# Simple test nodes (commented out - source files are empty)
+# add_executable(can_frame_publisher src/can_frame_publisher.cpp)
+# target_link_libraries(can_frame_publisher usb_can_driver)
+# ament_target_dependencies(can_frame_publisher rclcpp std_msgs)
 
-add_executable(can_frame_subscriber src/can_frame_subscriber.cpp)
-target_link_libraries(can_frame_subscriber usb_can_driver)
-ament_target_dependencies(can_frame_subscriber rclcpp std_msgs)
+# add_executable(can_frame_subscriber src/can_frame_subscriber.cpp)
+# target_link_libraries(can_frame_subscriber usb_can_driver)
+# ament_target_dependencies(can_frame_subscriber rclcpp std_msgs)
+
 
 # Install targets
 install(TARGETS
-  usb_can_socketcan_bridge
-  can_frame_publisher
-  can_frame_subscriber
+  # usb_can_socketcan_bridge  # commented out - source file missing
+  # can_frame_publisher       # commented out - source file empty
+  # can_frame_subscriber      # commented out - source file empty
+  test_frames
+  test_portability
   DESTINATION lib/${PROJECT_NAME})
 
 install(TARGETS

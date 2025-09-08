@@ -32,6 +32,12 @@
 
 #pragma once
 
+// Include common C++ standard library headers that users commonly need
+#include <vector>
+#include <memory>
+#include <stdexcept>
+#include <iostream>
+
 // Include common definitions first
 #include "usb_can_common.hpp"
 
@@ -55,10 +61,13 @@
  *
  * Example usage:
  * @code
+ * // Single include for all USB-CAN frame functionality
+ * #include "ros2_waveshare/usb_can_frames.hpp"
+ *
  * using namespace USBCANBridge;
  *
- * // Create a fixed frame
- * auto fixed_frame = FrameFactory::createFixedFrame(
+ * // Create a fixed frame using convenience aliases
+ * auto fixed_frame = Factory::createFixedFrame(
  *     Type::DATA_FIXED, FrameType::STD_FIXED, FrameFmt::DATA_FIXED);
  *
  * // Set frame properties
@@ -70,12 +79,17 @@
  * auto serialized = fixed_frame->serialize();
  *
  * // Create a variable frame
- * auto var_frame = FrameFactory::createVariableFrame(
+ * auto var_frame = Factory::createVariableFrame(
  *     FrameType::STD_VAR, FrameFmt::DATA_VAR, 6);
  *
  * // Auto-detect frame type from data
  * std::vector<uint8_t> raw_data = {0xAA, 0xC6, 0x34, 0x12};
- * auto frame = FrameFactory::createFrameFromData(raw_data);
+ * auto frame = Factory::createFrameFromData(raw_data);
+ *
+ * // Polymorphic usage
+ * std::vector<std::unique_ptr<BaseFrame>> frames;
+ * frames.push_back(std::move(fixed_frame));
+ * frames.push_back(std::move(var_frame));
  * @endcode
  */
 

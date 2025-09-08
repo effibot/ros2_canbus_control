@@ -18,7 +18,6 @@
 
 #include <memory>
 #include <vector>
-#include <stdexcept>
 
 namespace USBCANBridge
 {
@@ -30,49 +29,38 @@ namespace USBCANBridge
  */
 class FrameFactory {
 public:
-// Create fixed size frame
-static std::unique_ptr<FixedSizeFrame> createFixedFrame(
-	Type type, FrameType frame_type, FrameFmt fmt) {
-	return std::make_unique<FixedSizeFrame>(type, frame_type, fmt);
-}
+    /**
+     * @brief Create a fixed-size (20 byte) frame instance.
+     * @param type Frame meta type (DATA_FIXED or CONF_FIXED)
+     * @param frame_type Identifier type (STD_FIXED or EXT_FIXED)
+     * @param fmt Frame format (DATA_FIXED or REMOTE_FIXED)
+     * @return Newly allocated FixedSizeFrame unique_ptr
+     * @throws std::invalid_argument if parameters are invalid.
+     */
+    static std::unique_ptr<FixedSizeFrame> createFixedFrame(
+        Type type, FrameType frame_type, FrameFmt fmt);
 
-// Create variable size frame
-static std::unique_ptr<VariableSizeFrame> createVariableFrame(
-	FrameType frame_type, FrameFmt frame_fmt, uint8_t dlc = 0) {
-	return std::make_unique<VariableSizeFrame>(frame_type, frame_fmt, dlc);
-}
+    /**
+     * @brief Create a variable-length frame instance.
+     * @param frame_type STD_VAR or EXT_VAR
+     * @param frame_fmt DATA_VAR or REMOTE_VAR
+     * @param dlc Payload length (0..8)
+     * @return Newly allocated VariableSizeFrame unique_ptr
+     * @throws std::invalid_argument if parameters are invalid.
+     */
+    static std::unique_ptr<VariableSizeFrame> createVariableFrame(
+        FrameType frame_type, FrameFmt frame_fmt, uint8_t dlc = 0);
 
-// Create frame from raw data (auto-detect type)
-static std::unique_ptr<AdapterBaseFrame> createFrameFromData(
-	const std::vector<uint8_t>& raw_data) {
-
-	if (raw_data.empty()) {
-		throw std::invalid_argument("Empty data provided");
-	}
-
-	if (raw_data[0] != to_uint8(Constants::START_BYTE)) {
-		throw std::invalid_argument("Invalid start byte");
-	}
-
-	// Determine frame type based on size and structure
-	if (raw_data.size() == 20 && raw_data[1] == to_uint8(Constants::MSG_HEADER)) {
-		// Fixed frame
-		auto frame = std::make_unique<FixedSizeFrame>();
-		if (frame->deserialize(raw_data)) {
-			return frame;
-		}
-	} else if (raw_data.size() >= 6 && raw_data.size() <= 15 &&
-	           raw_data[raw_data.size() - 1] == to_uint8(Constants::END_BYTE)) {
-		// Variable frame
-		auto frame = std::make_unique<VariableSizeFrame>();
-		if (frame->deserialize(raw_data)) {
-			return frame;
-		}
-	}
-
-	throw std::invalid_argument("Unable to parse frame data");
-}
-
+    /**
+     * @brief Create a frame by parsing raw adapter bytes.
+     *
+     * Auto-detects fixed or variable frame based on size and sentinel bytes.
+     * @param raw_data Raw byte vector beginning with START_BYTE.
+     * @return Concrete frame instance (FixedSizeFrame or VariableSizeFrame)
+     * @throws std::invalid_argument if parsing fails or data invalid.
+     */
+    static std::unique_ptr<AdapterBaseFrame> createFrameFromData(
+        const std::vector<uint8_t>& raw_data);
 };
 
 } // namespace USBCANBridge

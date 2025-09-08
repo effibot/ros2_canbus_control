@@ -1,3 +1,21 @@
+/**
+ * @file usb_can_common.hpp
+ * @brief Common protocol definitions, enumerations and helper utilities for USB-CAN adapter frames.
+ *
+ * This header centralizes protocol constants, strongly-typed enumerations, index helpers for
+ * fixed and variable frame layouts, as well as constexpr conversion helpers and utility bit
+ * manipulation routines. All frame implementation headers include this file to ensure a single
+ * authoritative definition of protocol semantics.
+ *
+ * Design goals:
+ * - Strong typing via enum class to avoid accidental mixing of domains (e.g., Type vs FrameFmt)
+ * - constexpr inline helpers to eliminate repetitive static_cast usage
+ * - Clear Doxygen documentation to generate complete API reference
+ * - Arithmetic operator overloads for VarSizeIndex to simplify dynamic layout computation
+ *
+ * @author Andrea
+ * @date 2025
+ */
 #pragma once
 
 #include <cstdint>
@@ -9,6 +27,14 @@ namespace USBCANBridge
 
 //* -- USB adapter constants and enums --*
 // Basic definitions for common and constant values
+/**
+ * @enum Constants
+ * @brief Fundamental single-byte protocol constants used in frame construction.
+ *
+ * These values appear verbatim inside serialized frames as structural markers
+ * (e.g., START_BYTE, END_BYTE) or reserved padding. They are not meant to be
+ * mutated at runtime.
+ */
 enum class Constants : uint8_t
 {
 	START_BYTE = 0xAA,
@@ -28,6 +54,10 @@ enum class Constants : uint8_t
 	END_BYTE = 0x55,
 };
 
+/**
+ * @enum Type
+ * @brief Adapter packet type (distinguishes fixed vs variable and data vs config).
+ */
 enum class Type : uint8_t {
 	/**
 	 * @brief USB-CAN-A adapter packet type enumeration
@@ -46,6 +76,10 @@ enum class Type : uint8_t {
 	CONF_VAR = 0x12,
 };
 
+/**
+ * @enum FrameType
+ * @brief CAN identifier width specifier for each protocol variant.
+ */
 enum class FrameType : uint8_t {
 	/**
 	 * @brief USB-CAN-A adapter frame type enumeration
@@ -64,6 +98,10 @@ enum class FrameType : uint8_t {
 	EXT_VAR = 1,
 };
 
+/**
+ * @enum FrameFmt
+ * @brief CAN frame format (data payload or remote request) in both fixed and variable protocols.
+ */
 enum class FrameFmt : uint8_t {
 	/**
 	 * @brief USB-CAN-A adapter frame format enumeration
@@ -83,6 +121,10 @@ enum class FrameFmt : uint8_t {
 	REMOTE_VAR = 1
 };
 
+/**
+ * @enum CANBaud
+ * @brief Enumeration of supported CAN bus nominal bit rates.
+ */
 enum class CANBaud : uint8_t {
 	/**
 	 * @brief USB-CAN-A adapter CAN bus speed enumeration
@@ -116,6 +158,10 @@ enum class CANBaud : uint8_t {
 	SPEED_5K = 0x0C
 };
 
+/**
+ * @enum SerialBaud
+ * @brief Enumeration of supported USB serial bridge baud rates.
+ */
 enum class SerialBaud : uint32_t {
 	/**
 	 * @brief USB-CAN-A adapter serial port baud rate enumeration
@@ -142,6 +188,10 @@ enum class SerialBaud : uint32_t {
 	BAUD_200000 = 2000000
 };
 
+/**
+ * @enum CANMode
+ * @brief Operating modes controlling transceiver behavior and echo.
+ */
 enum class CANMode : uint8_t {
 	/**
 	 * @brief USB-CAN-A adapter operating mode enumeration
@@ -159,6 +209,10 @@ enum class CANMode : uint8_t {
 	LOOPBACK_SILENT = 0x03
 };
 
+/**
+ * @enum RTX
+ * @brief Auto retransmission policy for failed CAN frame arbitration or errors.
+ */
 enum class RTX : uint8_t {
 	/**
 	 * @brief USB-CAN-A adapter auto-retransmission setting enumeration
@@ -173,6 +227,10 @@ enum class RTX : uint8_t {
 	OFF = 0x01
 };
 
+/**
+ * @enum FixedSizeIndex
+ * @brief Byte offsets for the 20-byte fixed frame representation.
+ */
 enum class FixedSizeIndex : std::size_t {
 	/**
 	 * @brief USB-CAN-A adapter fixed frame byte index enumeration
@@ -213,6 +271,13 @@ enum class FixedSizeIndex : std::size_t {
 	CHECKSUM = 19
 };
 
+/**
+ * @enum VarSizeIndex
+ * @brief Base byte offsets for the variable-length frame representation.
+ *
+ * Dynamic indices (ID_END, DATA_START, DATA_END, END) are computed at runtime and
+ * stored in the variable frame object; this enum supplies the starting anchors.
+ */
 enum class VarSizeIndex : std::size_t {
 	/**
 	 * @brief USB-CAN-A adapter variable frame byte index enumeration
@@ -242,6 +307,14 @@ enum class VarSizeIndex : std::size_t {
 	// END is dynamic based on ID size
 };
 
+// -------------------------------------------------------------------------------------------------
+// Conversion helpers
+// -------------------------------------------------------------------------------------------------
+/**
+ * @name Conversion helpers
+ * @brief constexpr wrappers replacing repetitive static_cast expressions.
+ * @note All functions are noexcept and eligible for compile-time evaluation.
+ * @{ */
 // Utility functions to avoid static_cast repetition (C++17 style)
 [[nodiscard]] constexpr auto to_uint8(Constants value) noexcept {
 	return static_cast<uint8_t>(value);
@@ -286,7 +359,18 @@ enum class VarSizeIndex : std::size_t {
 [[nodiscard]] constexpr VarSizeIndex to_VarSizeIndex(std::size_t value) noexcept {
 	return static_cast<VarSizeIndex>(value);
 }
+/** @} */
 
+// -------------------------------------------------------------------------------------------------
+// VarSizeIndex arithmetic operators
+// -------------------------------------------------------------------------------------------------
+/**
+ * @name VarSizeIndex arithmetic
+ * @brief Convenience overloads to manipulate dynamic variable frame indices.
+ *
+ * These operators intentionally mirror pointer/size_t arithmetic semantics to simplify
+ * calculations when recomputing layout boundaries after ID or payload resizing.
+ * @{ */
 // redefine math operators for VarSizeIndex, so that we can do things like ID_END = ID_START + 1
 constexpr VarSizeIndex operator+(VarSizeIndex lhs, std::size_t rhs) noexcept {
 	return static_cast<VarSizeIndex>(to_uint(lhs) + rhs);
@@ -361,9 +445,24 @@ constexpr bool operator!=(VarSizeIndex lhs, std::size_t rhs) noexcept {
 constexpr bool operator!=(std::size_t lhs, VarSizeIndex rhs) noexcept {
 	return lhs != to_uint(rhs);
 }
+/** @} */
 
 
 
+// -------------------------------------------------------------------------------------------------
+// Variable frame type byte helpers
+// -------------------------------------------------------------------------------------------------
+/**
+ * @brief Assemble a packed type byte for variable-length frames.
+ *
+ * Layout (bit positions):
+ * - 7..6: constant 1 bits (0b11)
+ * - 5: frame type (0 = standard, 1 = extended)
+ * - 4: frame format (0 = data, 1 = remote)
+ * - 3..0: DLC (0..8)
+ *
+ * @throws std::out_of_range if dlc > 8
+ */
 // Helper function to create variable frame type byte (C++17 style)
 [[nodiscard]] constexpr auto make_variable_type_byte(FrameType type, FrameFmt fmt, uint8_t dlc) {
 	/**
@@ -423,40 +522,25 @@ constexpr bool operator!=(std::size_t lhs, VarSizeIndex rhs) noexcept {
 }
 
 
-/*
-   TODO: move this to usb_can_frame.hpp and change the arguments to the baseFrame class
-
-   // Additional convenience functions for common operations
-   [[nodiscard]] constexpr bool is_data_frame(FrameFmt fmt) noexcept {
-        return fmt == FrameFmt::DATA_FIXED || fmt == FrameFmt::DATA_VAR;
-   }
-
-   [[nodiscard]] constexpr bool is_remote_frame(FrameFmt fmt) noexcept {
-        return fmt == FrameFmt::REMOTE_FIXED || fmt == FrameFmt::REMOTE_VAR;
-   }
-   [[nodiscard]] constexpr bool is_standard_frame(FrameType type) noexcept {
-        return type == FrameType::STD_FIXED || type == FrameType::STD_VAR;
-   }
-
-   [[nodiscard]] constexpr bool is_extended_frame(FrameType type) noexcept {
-        return type == FrameType::EXT_FIXED || type == FrameType::EXT_VAR;
-   }
-
-   [[nodiscard]] constexpr bool is_fixed_frame(FrameType type) noexcept {
-        return type == FrameType::STD_FIXED || type == FrameType::EXT_FIXED;
-   }
-
-   [[nodiscard]] constexpr bool is_variable_frame(FrameType type) noexcept {
-        return type == FrameType::STD_VAR || type == FrameType::EXT_VAR;
-   }
+/**
+ * @todo Consider relocating convenience frame classification helpers (is_data_frame, etc.)
+ *       into a dedicated traits header if/when they are implemented to keep this file lean.
  */
 
-//? defines of default settings
-constexpr uint32_t DEF_FILTER_SETTING = 0x00000000;                    // Default filter setting (accept all IDs)
-constexpr uint32_t DEF_MASK_SETTING = 0x00000000;                      // Default mask setting (no bits are masked)
-constexpr CANBaud DEF_CAN_SPEED = CANBaud::SPEED_1000K;                // Default CAN bus speed
-constexpr SerialBaud DEF_BAUD_RATE = SerialBaud::BAUD_200000;          // Default baud rate for the serial interface
-constexpr CANMode DEF_CAN_MODE = CANMode::NORMAL;                      // Default operating mode for the adapter
-constexpr RTX DEF_RTX = RTX::AUTO;                                     // Default auto-retransmission setting
+// -------------------------------------------------------------------------------------------------
+// Default configuration presets
+// -------------------------------------------------------------------------------------------------
+/** @brief Default acceptance filter (accept all standard & extended IDs). */
+constexpr uint32_t DEF_FILTER_SETTING = 0x00000000;
+/** @brief Default mask (no bit masked => all bits relevant). */
+constexpr uint32_t DEF_MASK_SETTING = 0x00000000;
+/** @brief Preferred default CAN bus speed (1 Mbps). */
+constexpr CANBaud DEF_CAN_SPEED = CANBaud::SPEED_1000K;
+/** @brief Default high performance serial baud rate (2 Mbps). */
+constexpr SerialBaud DEF_BAUD_RATE = SerialBaud::BAUD_200000;
+/** @brief Default adapter mode (normal bus participation). */
+constexpr CANMode DEF_CAN_MODE = CANMode::NORMAL;
+/** @brief Default auto-retransmission behavior (enabled). */
+constexpr RTX DEF_RTX = RTX::AUTO;
 
 } // namespace USBCANBridge

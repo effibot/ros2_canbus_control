@@ -142,6 +142,9 @@ RUN /tmp/scripts/install_starship.sh
 # Install zoxide for the user
 RUN runuser -l ${USERNAME} -c '/tmp/scripts/install_zoxide.sh'
 
+# Install gh-cli for the user
+RUN runuser -l ${USERNAME} -c '/tmp/scripts/install_gh_cli.sh'
+
 # Fix ownership of every file and directory under home directory
 #RUN chown -R ${USERNAME}:${USERNAME} ${HOME}
 
