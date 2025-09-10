@@ -80,8 +80,10 @@ bool inDataRange(size_t index) const override;
 // Data manipulation methods
 void setData(const std::vector<uint8_t>& new_data) override;
 void setData(size_t index, uint8_t value) override;
-std::vector<uint8_t> getData() const override;
 uint8_t getData(size_t index) const override;
+
+// Data access methods
+std::pair<std::array<uint8_t, 8>, uint8_t> getDataArray() const override;
 
 // Protocol handling methods
 void setType(Type type) override;
@@ -95,9 +97,11 @@ uint8_t getDLC() const override;
 bool isValidLength() const override;
 void setID(uint32_t id_value) override;
 uint32_t getID() const override;
-std::vector<uint8_t> getIDBytes() const override;
 void setIDBytes(const std::vector<uint8_t>& id_bytes) override;
 bool isValidID() const override;
+
+// ID access methods
+std::pair<std::array<uint8_t, 4>, uint8_t> getIDArray() const override;
 
 // Checksum methods
 uint8_t getChecksum() const;

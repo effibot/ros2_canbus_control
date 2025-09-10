@@ -13,6 +13,7 @@
 #include <string>
 #include <iostream>
 #include <iomanip>
+#include <cstring>  // for memset
 
 namespace USBCANBridge
 {
@@ -26,14 +27,14 @@ uint8_t FixedSizeFrame::calculateChecksum() const {
 	 * @return 8-bit checksum value.
 	 * @complexity O(1) (fixed number of additions).
 	 */
-	uint32_t sum = 0;
-	sum += type_;
-	sum += frame_type_;
-	sum += frame_fmt_;
-	sum += std::accumulate(id_bytes_.begin(), id_bytes_.end(), 0);
-	sum += dlc_;
-	sum += std::accumulate(data_.begin(), data_.end(), 0);
-	sum += reserved_;
+
+	uint32_t sum = type_ +
+	               frame_type_ +
+	               frame_fmt_ +
+	               std::accumulate(id_bytes_.begin(), id_bytes_.end(), 0)  +
+	               dlc_    +
+	               std::accumulate(data_.begin(), data_.end(), 0)  +
+	               reserved_;
 	return static_cast<uint8_t>(sum & 0xFF);
 }
 
@@ -86,55 +87,38 @@ FixedSizeFrame::FixedSizeFrame(Type type, FrameType frame_type, FrameFmt fmt)
 // Index access operators
 uint8_t& FixedSizeFrame::operator[](std::size_t index) {
 	/**
-	 * @brief Direct unchecked byte access (except internal validateIndex call).
+	 * @brief Direct byte access using lookup table.
 	 * @param index Byte offset (0..19).
 	 * @return Reference to underlying byte for mutation.
 	 * @throw std::out_of_range if index invalid.
 	 */
 	validateIndex(index);
-	switch (index) {
-	case to_uint(FixedSizeIndex::START):
-		return const_cast<uint8_t&>(start_byte_);
-	case to_uint(FixedSizeIndex::HEADER):
-		return const_cast<uint8_t&>(msg_header_);
-	case to_uint(FixedSizeIndex::TYPE):
-		return type_;
-	case to_uint(FixedSizeIndex::FRAME_TYPE):
-		return frame_type_;
-	case to_uint(FixedSizeIndex::FRAME_FMT):
-		return frame_fmt_;
-	case to_uint(FixedSizeIndex::ID_0):
-		return id_bytes_[0];
-	case to_uint(FixedSizeIndex::ID_1):
-		return id_bytes_[1];
-	case to_uint(FixedSizeIndex::ID_2):
-		return id_bytes_[2];
-	case to_uint(FixedSizeIndex::ID_3):
-		return id_bytes_[3];
-	case to_uint(FixedSizeIndex::DLC):
-		return dlc_;
-	case to_uint(FixedSizeIndex::DATA_0):
-		return data_[0];
-	case to_uint(FixedSizeIndex::DATA_1):
-		return data_[1];
-	case to_uint(FixedSizeIndex::DATA_2):
-		return data_[2];
-	case to_uint(FixedSizeIndex::DATA_3):
-		return data_[3];
-	case to_uint(FixedSizeIndex::DATA_4):
-		return data_[4];
-	case to_uint(FixedSizeIndex::DATA_5):
-		return data_[5];
-	case to_uint(FixedSizeIndex::DATA_6):
-		return data_[6];
-	case to_uint(FixedSizeIndex::DATA_7):
-		return data_[7];
-	case to_uint(FixedSizeIndex::RESERVED):
+
+	// Fast path: use lookup table for better branch prediction
+	if (__builtin_expect(index <= 9, 1)) {
+		// Header + ID + DLC (indices 0-9)
+		static uint8_t* const header_fields[] = {
+			const_cast<uint8_t*>(&start_byte_),   // 0
+			const_cast<uint8_t*>(&msg_header_),   // 1
+			&type_,                               // 2
+			&frame_type_,                         // 3
+			&frame_fmt_,                          // 4
+			&id_bytes_[0],                        // 5
+			&id_bytes_[1],                        // 6
+			&id_bytes_[2],                        // 7
+			&id_bytes_[3],                        // 8
+			&dlc_                                 // 9
+		};
+		return *header_fields[index];
+	} else if (__builtin_expect(index <= 17, 1)) {
+		// Data bytes (indices 10-17)
+		return data_[index - 10];
+	} else if (index == 18) {
+		// Reserved byte
 		return const_cast<uint8_t&>(reserved_);
-	case to_uint(FixedSizeIndex::CHECKSUM):
+	} else {
+		// Checksum byte (index 19)
 		return checksum_;
-	default:
-		throw std::out_of_range("Unhandled index for FixedSizeFrame");
 	}
 }
 
@@ -204,7 +188,7 @@ bool FixedSizeFrame::inDataRange(size_t index) const {
 // Data manipulation methods
 void FixedSizeFrame::setData(const std::vector<uint8_t>& new_data) {
 	/**
-	 * @brief Set payload bytes (pads with zeros if fewer than 8).
+	 * @brief Set payload data from vector.
 	 * @param new_data Vector size 0..8.
 	 * @throw std::invalid_argument if new_data larger than 8.
 	 */
@@ -212,11 +196,16 @@ void FixedSizeFrame::setData(const std::vector<uint8_t>& new_data) {
 		throw std::invalid_argument("Data size exceeds fixed frame capacity");
 	}
 
-	std::size_t bytes_to_copy = std::min(new_data.size(), data_.size());
-	std::copy(new_data.begin(), new_data.begin() + bytes_to_copy, data_.begin());
+	const std::size_t bytes_to_copy = new_data.size();
 
+	// Fast bulk copy for the actual data
+	if (bytes_to_copy > 0) {
+		std::copy(new_data.begin(), new_data.end(), data_.begin());
+	}
+
+	// Zero remaining bytes if needed (more efficient than std::fill for small sizes)
 	if (bytes_to_copy < data_.size()) {
-		std::fill(data_.begin() + bytes_to_copy, data_.end(), 0);
+		std::memset(data_.data() + bytes_to_copy, 0, data_.size() - bytes_to_copy);
 	}
 
 	checksum_ = calculateChecksum();
@@ -224,20 +213,15 @@ void FixedSizeFrame::setData(const std::vector<uint8_t>& new_data) {
 
 void FixedSizeFrame::setData(size_t index, uint8_t value) {
 	/**
-	 * @brief Set a single payload byte.
+	 * @brief Set single payload byte value.
 	 * @param index 0..7
 	 * @throw std::out_of_range if index invalid.
 	 */
 	if (!inDataRange(index)) {
 		throw std::out_of_range("Data index out of range");
 	}
-	data_.at(index) = value;
+	data_[index] = value;
 	checksum_ = calculateChecksum();
-}
-
-std::vector<uint8_t> FixedSizeFrame::getData() const {
-	/** @brief Return copy of entire 8-byte payload buffer. */
-	return std::vector<uint8_t>(data_.begin(), data_.end());
 }
 
 uint8_t FixedSizeFrame::getData(size_t index) const {
@@ -248,7 +232,13 @@ uint8_t FixedSizeFrame::getData(size_t index) const {
 	if (!inDataRange(index)) {
 		throw std::out_of_range("Data index out of range");
 	}
-	return data_.at(index);
+	return data_[index];
+}
+
+// Data access methods
+std::pair<std::array<uint8_t, 8>, uint8_t> FixedSizeFrame::getDataArray() const {
+	/** @brief Return data as array with DLC size (zero-copy). */
+	return std::make_pair(data_, dlc_);
 }
 
 // Protocol handling methods
@@ -369,11 +359,6 @@ uint32_t FixedSizeFrame::getID() const {
 	}
 }
 
-std::vector<uint8_t> FixedSizeFrame::getIDBytes() const {
-	/** @brief Return copy of ID byte array. */
-	return std::vector<uint8_t>(id_bytes_.begin(), id_bytes_.end());
-}
-
 void FixedSizeFrame::setIDBytes(const std::vector<uint8_t>& id_bytes) {
 	/**
 	 * @brief Set ID from byte vector and refresh checksum.
@@ -384,6 +369,12 @@ void FixedSizeFrame::setIDBytes(const std::vector<uint8_t>& id_bytes) {
 	}
 	std::copy(id_bytes.begin(), id_bytes.end(), id_bytes_.begin());
 	checksum_ = calculateChecksum();
+}
+
+// ID access methods
+std::pair<std::array<uint8_t, 4>, uint8_t> FixedSizeFrame::getIDArray() const {
+	/** @brief Return ID as array (always 4 bytes for fixed frame). */
+	return std::make_pair(id_bytes_, 4);
 }
 
 bool FixedSizeFrame::isValidID() const {

@@ -46,13 +46,13 @@ ament_target_dependencies(usb_can_driver rclcpp)
 
 
 # Install targets
-install(TARGETS
-  # usb_can_socketcan_bridge  # commented out - source file missing
-  # can_frame_publisher       # commented out - source file empty
-  # can_frame_subscriber      # commented out - source file empty
-  test_frames
-  test_portability
-  DESTINATION lib/${PROJECT_NAME})
+#install(TARGETS
+#  # usb_can_socketcan_bridge  # commented out - source file missing
+#  # can_frame_publisher       # commented out - source file empty
+#  # can_frame_subscriber      # commented out - source file empty
+#  test_frames
+#  test_portability
+#  DESTINATION lib/${PROJECT_NAME})
 
 install(TARGETS
   usb_can_driver

@@ -3,5 +3,3 @@
 #include <iostream>
 
 namespace USBCANBridge
-{
-    FrameBu

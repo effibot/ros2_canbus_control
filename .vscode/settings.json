@@ -120,7 +120,10 @@
     "C_Cpp.default.cppStandard": "c++17",
     "C_Cpp.default.includePath": [
         "/opt/ros/jazzy/include/**",
-        "/usr/include/**"
+        "/usr/include/**",
+        "${workspaceFolder}/src/**/**/include",
+        "${workspaceFolder}/src/**/include",
+        "${workspaceFolder}/src/**"
     ],
     // Terminal settings
     "terminal.integrated.shell.linux": "/bin/bash",
@@ -151,10 +154,12 @@
     },
     "ROS2.distro": "jazzy",
     "python.autoComplete.extraPaths": [
-        "/opt/ros/jazzy/lib/python3.12/site-packages"
+        "/opt/ros/jazzy/lib/python3.12/site-packages",
+        "${workspaceFolder}/src"
     ],
     "python.analysis.extraPaths": [
-        "/opt/ros/jazzy/lib/python3.12/site-packages"
+        "/opt/ros/jazzy/lib/python3.12/site-packages",
+        "${workspaceFolder}/src"
     ],
     "python.analysis.autoImportCompletions": true,
     "cmake.ignoreCMakeListsMissing": true,

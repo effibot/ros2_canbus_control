@@ -95,13 +95,21 @@ virtual std::size_t size() const = 0;
  * @brief Access and modify only the CAN payload portion of the frame.
  *
  * Implementations should enforce maximum payload length (<= 8 bytes) and
- * ensure DLC consistency where applicable.
+ * ensure DLC consistency where applicable. Array-based accessors return
+ * both the data array and the actual size to avoid bounds checking overhead.
  * @{ */
 virtual void setData(const std::vector<uint8_t>& new_data) = 0;
 virtual void setData(size_t index, uint8_t value) = 0;
-virtual std::vector<uint8_t> getData() const = 0;
 virtual uint8_t getData(size_t index) const = 0;
 virtual bool inDataRange(size_t index) const = 0;
+
+/**
+ * @brief Get data as fixed-size array with actual size.
+ * @return std::pair<array, actual_size> where actual_size <= 8
+ * @details Returns the internal data array and the valid data length.
+ *          The array is always 8 bytes but only the first 'actual_size' bytes are valid.
+ */
+virtual std::pair<std::array<uint8_t, 8>, uint8_t> getDataArray() const = 0;
 /** @} */
 
 // Protocol handling interface
@@ -110,7 +118,8 @@ virtual bool inDataRange(size_t index) const = 0;
  * @brief Manage protocol specific attributes (type, frame type, format, DLC, ID).
  *
  * These functions must validate arguments and throw std::invalid_argument in
- * case of invalid protocol values.
+ * case of invalid protocol values. Array-based accessors return both the
+ * ID bytes and actual size to handle standard (2 bytes) vs extended (4 bytes) IDs.
  * @{ */
 virtual void setType(Type type) = 0;
 virtual Type getType() const = 0;
@@ -123,9 +132,16 @@ virtual uint8_t getDLC() const = 0;
 virtual bool isValidLength() const = 0;
 virtual void setID(uint32_t id) = 0;
 virtual uint32_t getID() const = 0;
-virtual std::vector<uint8_t> getIDBytes() const = 0;
 virtual void setIDBytes(const std::vector<uint8_t>& id_bytes) = 0;
 virtual bool isValidID() const = 0;
+
+/**
+ * @brief Get ID bytes as fixed-size array with actual size.
+ * @return std::pair<array, actual_size> where actual_size is 2 or 4
+ * @details Returns the internal ID array and the valid ID length.
+ *          Standard frames use 2 bytes, extended frames use 4 bytes.
+ */
+virtual std::pair<std::array<uint8_t, 4>, uint8_t> getIDArray() const = 0;
 /** @} */
 
 // Serialization interface
