@@ -105,7 +105,7 @@ enum class Type : std::uint8_t {
 	DATA_FIXED = 0x01,    ///< Fixed-length data frame (20 bytes total)
 	DATA_VAR = 0xC0,      ///< Variable-length data frame (up to 8 data bytes)
 	CONF_FIXED = 0x02,    ///< Fixed-length configuration frame
-	CONF_VAR = 0x12       ///< Variable-length configuration frame
+	CONF = 0x12       ///< Variable-length configuration frame
 };
 
 /**
@@ -242,5 +242,22 @@ enum class FixedSizeIndex : std::size_t {
 	RESERVED = 18,    ///< Position of reserved byte (always 0x00)
 	CHECKSUM = 19     ///< Position of checksum byte (frame validation)
 };
+
+// Conversion helpers
+constexpr uint8_t to_uint8(Constants v) {
+	return static_cast<uint8_t>(v);
+}
+constexpr uint8_t to_uint8(Type v) {
+	return static_cast<uint8_t>(v);
+}
+constexpr uint8_t to_uint8(FrameType v) {
+	return static_cast<uint8_t>(v);
+}
+constexpr uint8_t to_uint8(FrameFmt v) {
+	return static_cast<uint8_t>(v);
+}
+constexpr std::size_t to_uint(FixedSizeIndex v) {
+	return static_cast<std::size_t>(v);
+}
 
 } // namespace USBCANBridge

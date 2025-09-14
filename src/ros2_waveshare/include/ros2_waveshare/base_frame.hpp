@@ -53,33 +53,11 @@ class VariableSizeFrame;
 
 template<typename Frame>
 struct FrameTraits;
+/**
+ *! FrameTraits specializations are defined in fixed_frame.hpp and var_frame.hpp
+ *! the needed types are: FRAME_SIZE, ID_SIZE, DATA_SIZE, StorageType, IDType, DataType, PayloadPair, IDPair
+ */
 
-// * Fixed size frame traits
-template<>
-struct FrameTraits<FixedSizeFrame> {
-	static constexpr std::size_t FRAME_SIZE = 20;
-	static constexpr std::size_t ID_SIZE = 4;
-	static constexpr std::size_t DATA_SIZE = 8;
-
-
-	using StorageType = std::array<uint8_t, FRAME_SIZE>;
-	using IDType = std::array<uint8_t, ID_SIZE>;
-	using DataType = std::array<uint8_t, DATA_SIZE>;
-	using SerializeReturnType = std::array<uint8_t, FRAME_SIZE>;
-};
-
-// * Variable size frame traits
-template<>
-struct FrameTraits<VariableSizeFrame> {
-	static constexpr std::size_t MAX_FRAME_SIZE = 13; // 1+1+4+8-1
-	static constexpr std::size_t MAX_ID_SIZE = 4;
-	static constexpr std::size_t MAX_DATA_SIZE = 8;
-
-	using StorageType = std::array<uint8_t, MAX_FRAME_SIZE>;
-	using IDType = std::array<uint8_t, MAX_ID_SIZE>;
-	using DataType = std::array<uint8_t, MAX_DATA_SIZE>;
-	using SerializeReturnType = std::vector<uint8_t>;
-};
 
 // * templating to allow static polymorphism via CRTP
 template <typename Derived>
@@ -99,8 +77,13 @@ static constexpr std::uint8_t START_BYTE = Constants::START_BYTE;
 public:
 // Constructors
 explicit BaseFrame() {
-}
+};
 
+// Bring traits into scope and define useful types
+using traits = FrameTraits<Derived>;
+using storage = typename traits::StorageType;
+using payload = typename traits::PayloadPair;
+using id_t = typename traits::IDPair;
 // Disable copy/assignment to avoid slicing
 BaseFrame(const BaseFrame&) = delete;
 BaseFrame& operator=(const BaseFrame&) = delete;
@@ -132,7 +115,7 @@ uint8_t* begin() {
 uint8_t* end() {
 	return derived().impl_end();
 };
-const uint8_t* begin() const {	
+const uint8_t* begin() const {
 	return derived().impl_begin();
 };
 const uint8_t* end() const {
@@ -146,6 +129,129 @@ std::size_t size() const {
 };
 
 // * Interface for data manipulation
-
-
+Result<payload> getData() const {
+	return derived().impl_getData();
+};
+Result<payload> getData(size_t index) const {
+	return derived().impl_getData(index);
+};
+Result<bool> setData(const payload& new_data){
+	// * invoke the derived validateData method
+	auto validation = validateData(new_data);
+	if (validation.fail()) {
+		return Result<bool>::error(validation.status);
+	}
+	// * if validation passed, call the implementation
+	return derived().impl_setData(new_data);
+};
+// * Interface for type manipulation
+Result<Type> getType() const {
+	return derived().impl_getType();
+};
+Result<bool> setType(Type type) {
+	// * invoke the derived validateType method
+	auto validation = validateType(type);
+	if (validation.fail()) {
+		return Result<bool>::error(validation.status);
+	}
+	// * if validation passed, call the implementation
+	return derived().impl_setType(type);
+};
+// * Interface for frame type manipulation
+Result<FrameType> getFrameType() const {
+	return derived().impl_getFrameType();
+};
+Result<bool> setFrameType(FrameType frame_type) {
+	// * invoke the derived validateFrameType method
+	auto validation = validateFrameType(frame_type);
+	if (validation.fail()) {
+		return Result<bool>::error(validation.status);
+	}
+	// * if validation passed, call the implementation
+	return derived().impl_setFrameType(frame_type);
+};
+// * Interface for frame format manipulation
+Result<FrameFmt> getFrameFmt() const {
+	return derived().impl_getFrameFmt();
+};
+Result<bool> setFrameFmt(FrameFmt frame_fmt) {
+	// * invoke the derived validateFrameFmt method
+	auto validation = validateFrameFmt(frame_fmt);
+	if (validation.fail()) {
+		return Result<bool>::error(validation.status);
+	}
+	// * if validation passed, call the implementation
+	return derived().impl_setFrameFmt(frame_fmt);
+};
+// * Interface for DLC manipulation
+Result<uint8_t> getDLC() const {
+	return derived().impl_getDLC();
+};
+Result<bool> setDLC(uint8_t dlc) {
+	// * invoke the derived validateDLC method
+	auto validation = validateDLC(dlc);
+	if (validation.fail()) {
+		return Result<bool>::error(validation.status);
+	}
+	// * if validation passed, call the implementation
+	return derived().impl_setDLC(dlc);
+};
+//* Interface for ID manipulation
+Result<id_t> getID() const {
+	return derived().impl_getID();
+};
+Result<bool> setID(const id_t& id) {
+	// * invoke the derived validateID method
+	auto validation = validateID(id);
+	if (validation.fail()) {
+		return Result<bool>::error(validation.status);
+	}
+	// * if validation passed, call the implementation
+	return derived().impl_setID(id);
+};
+// * Interface for serialization/deserialization
+Result<storage> serialize() const {
+	// * Invoke the validateFrame method
+	auto validation = validateFrame();
+	if (validation.fail()) {
+		return Result<storage>::error(validation.status);
+	}
+	// * If validation passed, call the implementation
+	return derived().impl_serialize();
+};
+Result<bool> deserialize(const std::vector<uint8_t>& data) {
+	// * invoke the derived validateFrame method
+	auto validation = validateFrameData(data);
+	if (validation.fail()) {
+		return Result<bool>::error(validation.status);
+	}
+	// * if validation passed, call the implementation
+	return derived().impl_deserialize(data);
+};
+// * Interface for frame validation
+Result<bool> validateFrame() const {
+	return derived().impl_validateFrame();
+};
+Result<bool> validateData() const {
+	return derived().impl_validateData();
+};
+Result<bool> validateID() const {
+	return derived().impl_validateID();
+};
+Result<bool> validateType(Type type) const {
+	return derived().impl_validateType(type);
+};
+Result<bool> validateFrameType(FrameType frame_type) const {
+	return derived().impl_validateFrameType(frame_type);
+};
+Result<bool> validateFrameFmt(FrameFmt frame_fmt) const {
+	return derived().impl_validateFrameFmt(frame_fmt);
+};
+Result<bool> validateDLC(uint8_t dlc) const {
+	return derived().impl_validateDLC(dlc);
+};
+Result<bool> validateID(const id_t& id) const {
+	return derived().impl_validateID(id);
+};
+};
 } // namespace USBCANBridge
