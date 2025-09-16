@@ -121,9 +121,7 @@ const uint8_t* begin() const {
 const uint8_t* end() const {
 	return derived().impl_end();
 };
-void fill(uint8_t value) {
-	derived().impl_fill(value);
-};
+
 std::size_t size() const {
 	return derived().impl_size();
 };

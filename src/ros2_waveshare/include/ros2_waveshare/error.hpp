@@ -6,8 +6,10 @@
  * @date 2025-09-11
  */
 
+#pragma once
 #include <system_error>
 #include <string>
+#include <type_traits>
 
 namespace USBCANBridge {
 
@@ -23,8 +25,7 @@ namespace USBCANBridge {
  * If starts with 'CAN' it is a CAN bus related error.
  * @see std::error_code
  */
-enum class Status
-{
+enum class Status : std::uint16_t {
 	SUCCESS = 0,    /**< No error */
 	WBAD_START = 1, /**< Bad start byte */
 	WBAD_TYPE = 2,  /**< Bad message type */
@@ -34,17 +35,18 @@ enum class Status
 	WBAD_DLC = 6,   /**< Bad DLC */
 	WBAD_FORMAT = 7,        /**< Bad format */
 	WBAD_CHECKSUM = 8,      /**< Bad checksum */
-	WTIMEOUT = 9,   /**< Timeout */
-	DNOT_FOUND = 10,        /**< Device not found */
-	DNOT_OPEN = 11, /**< Device not open */
-	DALREADY_OPEN = 12, /**< Device already open */
-	DREAD_ERROR = 13, /**< Device read error */
-	DWRITE_ERROR = 14, /**< Device write error */
-	DCONFIG_ERROR = 15, /**< Device configuration error */
-	CAN_SDO_TIMEOUT = 16, /**< CAN SDO timeout */
-	CAN_SDO_ABORT = 17, /**< CAN SDO abort */
-	CAN_PDO_ERROR = 18, /**< CAN PDO error */
-	CAN_NMT_ERROR = 19, /**< CAN NMT error */
+	WBAD_DATA_INDEX = 9,    /**< Bad data index */
+	WTIMEOUT = 10,   /**< Timeout */
+	DNOT_FOUND = 11,        /**< Device not found */
+	DNOT_OPEN = 12, /**< Device not open */
+	DALREADY_OPEN = 13, /**< Device already open */
+	DREAD_ERROR = 14, /**< Device read error */
+	DWRITE_ERROR = 15, /**< Device write error */
+	DCONFIG_ERROR = 16, /**< Device configuration error */
+	CAN_SDO_TIMEOUT = 17, /**< CAN SDO timeout */
+	CAN_SDO_ABORT = 18, /**< CAN SDO abort */
+	CAN_PDO_ERROR = 19, /**< CAN PDO error */
+	CAN_NMT_ERROR = 20, /**< CAN NMT error */
 	UNKNOWN = 255   /**< Unknown error */
 };
 
@@ -52,58 +54,37 @@ enum class Status
  * @class USBCANErrorCategory
  * @brief Custom error category for USBCANBridge errors.
  */
-class USBCANErrorCategory : public std::error_category
-{
+class USBCANErrorCategory : public std::error_category {
 public:
-const char* name() const noexcept override
-{
+const char* name() const noexcept override {
 	return "USBCANBridge::Status";
 }
 
-std::string message(int ev) const override
-{
-	switch (static_cast<Status>(ev))
-	{
-	case Status::SUCCESS:
-		return "Success";
-	case Status::WBAD_TYPE:
-		return "Bad message type";
-	case Status::WBAD_LENGTH:
-		return "Bad message length";
-	case Status::WBAD_ID:
-		return "Bad CAN ID";
-	case Status::WBAD_DATA:
-		return "Bad data";
-	case Status::WBAD_FORMAT:
-		return "Bad format";
-	case Status::WBAD_CHECKSUM:
-		return "Bad checksum";
-	case Status::WTIMEOUT:
-		return "Timeout";
-	case Status::DNOT_FOUND:
-		return "Device not found";
-	case Status::DNOT_OPEN:
-		return "Device not open";
-	case Status::DALREADY_OPEN:
-		return "Device already open";
-	case Status::DREAD_ERROR:
-		return "Device read error";
-	case Status::DWRITE_ERROR:
-		return "Device write error";
-	case Status::DCONFIG_ERROR:
-		return "Device configuration error";
-	case Status::CAN_SDO_TIMEOUT:
-		return "CAN SDO timeout";
-	case Status::CAN_SDO_ABORT:
-		return "CAN SDO abort";
-	case Status::CAN_PDO_ERROR:
-		return "CAN PDO error";
-	case Status::CAN_NMT_ERROR:
-		return "CAN NMT error";
-	case Status::UNKNOWN:
-		return "Unknown error";
-	default:
-		return "Unrecognized error";
+std::string message(int ev) const override {
+	switch (static_cast<Status>(ev)) {
+	case Status::SUCCESS: return "Success";
+	case Status::WBAD_START: return "Bad start byte";
+	case Status::WBAD_TYPE: return "Bad message type";
+	case Status::WBAD_LENGTH: return "Bad message length";
+	case Status::WBAD_ID: return "Bad CAN ID";
+	case Status::WBAD_DATA: return "Bad data";
+	case Status::WBAD_DLC: return "Bad DLC";
+	case Status::WBAD_FORMAT: return "Bad format";
+	case Status::WBAD_CHECKSUM: return "Bad checksum";
+	case Status::WBAD_DATA_INDEX: return "Bad data index";
+	case Status::WTIMEOUT: return "Timeout";
+	case Status::DNOT_FOUND: return "Device not found";
+	case Status::DNOT_OPEN: return "Device not open";
+	case Status::DALREADY_OPEN: return "Device already open";
+	case Status::DREAD_ERROR: return "Device read error";
+	case Status::DWRITE_ERROR: return "Device write error";
+	case Status::DCONFIG_ERROR: return "Device configuration error";
+	case Status::CAN_SDO_TIMEOUT: return "CAN SDO timeout";
+	case Status::CAN_SDO_ABORT: return "CAN SDO abort";
+	case Status::CAN_PDO_ERROR: return "CAN PDO error";
+	case Status::CAN_NMT_ERROR: return "CAN NMT error";
+	case Status::UNKNOWN: return "Unknown error";
+	default: return "Unrecognized error";
 	}
 }
 };
@@ -121,7 +102,7 @@ std::error_code make_error_code(Status e)
 	return { static_cast<int>(e), usbcan_category() };
 }
 
-} // namespace USBCANBridge
+}; // namespace USBCANBridge
 
 // Register the enum for use with std::error_code
 namespace std
@@ -130,7 +111,7 @@ template <>
 struct is_error_code_enum<USBCANBridge::Status> : true_type
 {
 };
-} // namespace std
+}; // namespace std
 
 /**
  * Usage example:

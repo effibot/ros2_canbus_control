@@ -54,7 +54,6 @@ uint8_t* impl_begin();
 uint8_t* impl_end();
 const uint8_t* impl_begin() const;
 const uint8_t* impl_end() const;
-void impl_fill(uint8_t value);
 std::size_t impl_size() const;
 // * Interface for data manipulation
 Result<payload> impl_getData() const;
