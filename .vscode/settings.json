@@ -167,6 +167,7 @@
     "cSpell.words": [
         "canopen",
         "canusb",
+        "DALREADY",
         "Efficace",
         "ffmt",
         "kbps",
@@ -175,6 +176,7 @@
         "TCSETS",
         "USBCANRTX",
         "Waveshare",
+        "WBAD",
         "xacro"
     ]
 }

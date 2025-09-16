@@ -48,8 +48,8 @@ struct Result {
 
 // * Frame Traits declaration for compile-time type selection
 // Forward declarations
-class FixedSizeFrame;
-class VariableSizeFrame;
+class FixedFrame;
+class VariableFrame;
 
 template<typename Frame>
 struct FrameTraits;

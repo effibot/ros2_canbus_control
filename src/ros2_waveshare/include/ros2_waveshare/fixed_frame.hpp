@@ -9,7 +9,7 @@
 namespace USBCANBridge {
 // * Fixed size frame traits
 template<>
-struct FrameTraits<FixedSizeFrame> {
+struct FrameTraits<FixedFrame> {
 	static constexpr std::size_t FRAME_SIZE = 20;
 	static constexpr std::size_t ID_SIZE = 4;
 	static constexpr std::size_t DATA_SIZE = 8;
@@ -22,7 +22,7 @@ struct FrameTraits<FixedSizeFrame> {
 	using IDPair = std::pair<IDType, uint8_t>;
 };
 // * Fixed size frame class (20 bytes total)
-class FixedSizeFrame : public BaseFrame<FixedSizeFrame> {
+class FixedFrame : public BaseFrame<FixedFrame> {
 private:
 // Storage for 20 bytes
 alignas(4) storage frame{};
@@ -35,7 +35,7 @@ uint8_t calculateChecksum() const;
 
 public:
 // Constructors
-FixedSizeFrame() : BaseFrame() {
+FixedFrame() : BaseFrame() {
 	// Initialize fixed frame structure
 	frame[to_uint(FixedSizeIndex::HEADER)] = to_uint8(Constants::MSG_HEADER);
 	frame[to_uint(FixedSizeIndex::TYPE)] = to_uint8(Type::DATA_FIXED);

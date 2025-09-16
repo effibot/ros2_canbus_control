@@ -14,30 +14,38 @@ namespace USBCANBridge {
 /**
  * @enum Status
  * @brief Enumeration of error codes for USBCANBridge operations.
+ * These codes can be converted to std::error_code for integration with
+ * standard error handling mechanisms.
+ * @note SUCCESS (0) indicates no error.
+ * Other values indicate specific error conditions.
+ * If starts with 'W' it is a warning.
+ * If starts with 'D' it is a device-related error.
+ * If starts with 'CAN' it is a CAN bus related error.
+ * @see std::error_code
  */
 enum class Status
 {
-	SUCCESS = 0,
-	WBAD_START = 1,
-	WBAD_TYPE = 2,
-	WBAD_LENGTH = 3,
-	WBAD_ID = 4,
-	WBAD_DATA = 5,
-	WBAD_DLC = 6,
-	WBAD_FORMAT = 7,
-	WBAD_CHECKSUM = 8,
-	WTIMEOUT = 9,
-	DNOT_FOUND = 10,
-	DNOT_OPEN = 11,
-	DALREADY_OPEN = 12,
-	DREAD_ERROR = 13,
-	DWRITE_ERROR = 14,
-	DCONFIG_ERROR = 15,
-	CAN_SDO_TIMEOUT = 16,
-	CAN_SDO_ABORT = 17,
-	CAN_PDO_ERROR = 18,
-	CAN_NMT_ERROR = 19,
-	UNKNOWN = 255
+	SUCCESS = 0,    /**< No error */
+	WBAD_START = 1, /**< Bad start byte */
+	WBAD_TYPE = 2,  /**< Bad message type */
+	WBAD_LENGTH = 3,        /**< Bad message length */
+	WBAD_ID = 4,    /**< Bad CAN ID */
+	WBAD_DATA = 5,  /**< Bad data */
+	WBAD_DLC = 6,   /**< Bad DLC */
+	WBAD_FORMAT = 7,        /**< Bad format */
+	WBAD_CHECKSUM = 8,      /**< Bad checksum */
+	WTIMEOUT = 9,   /**< Timeout */
+	DNOT_FOUND = 10,        /**< Device not found */
+	DNOT_OPEN = 11, /**< Device not open */
+	DALREADY_OPEN = 12, /**< Device already open */
+	DREAD_ERROR = 13, /**< Device read error */
+	DWRITE_ERROR = 14, /**< Device write error */
+	DCONFIG_ERROR = 15, /**< Device configuration error */
+	CAN_SDO_TIMEOUT = 16, /**< CAN SDO timeout */
+	CAN_SDO_ABORT = 17, /**< CAN SDO abort */
+	CAN_PDO_ERROR = 18, /**< CAN PDO error */
+	CAN_NMT_ERROR = 19, /**< CAN NMT error */
+	UNKNOWN = 255   /**< Unknown error */
 };
 
 /**
