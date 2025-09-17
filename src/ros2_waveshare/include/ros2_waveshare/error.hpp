@@ -28,27 +28,28 @@ namespace USBCANBridge {
 enum class Status : std::uint16_t {
 	SUCCESS = 0,    /**< No error */
 	WBAD_START = 1, /**< Bad start byte */
-	WBAD_TYPE = 2,  /**< Bad message type */
-	WBAD_FRAME_TYPE = 3, /**< Bad frame type */
-	WBAD_LENGTH = 4,        /**< Bad message length */
-	WBAD_ID = 5,    /**< Bad CAN ID */
-	WBAD_DATA = 6,  /**< Bad data */
-	WBAD_DLC = 7,   /**< Bad DLC */
-	WBAD_FORMAT = 8,        /**< Bad format */
-	WBAD_RESERVED = 9,      /**< Bad reserved byte */
-	WBAD_CHECKSUM = 10,      /**< Bad checksum */
-	WBAD_DATA_INDEX = 11,    /**< Bad data index */
-	WTIMEOUT = 12,   /**< Timeout */
-	DNOT_FOUND = 13,        /**< Device not found */
-	DNOT_OPEN = 14, /**< Device not open */
-	DALREADY_OPEN = 15, /**< Device already open */
-	DREAD_ERROR = 16, /**< Device read error */
-	DWRITE_ERROR = 17, /**< Device write error */
-	DCONFIG_ERROR = 18, /**< Device configuration error */
-	CAN_SDO_TIMEOUT = 19, /**< CAN SDO timeout */
-	CAN_SDO_ABORT = 20, /**< CAN SDO abort */
-	CAN_PDO_ERROR = 21, /**< CAN PDO error */
-	CAN_NMT_ERROR = 22, /**< CAN NMT error */
+	WBAD_HEADER = 2, /**< Bad header byte */
+	WBAD_TYPE = 3,  /**< Bad message type */
+	WBAD_FRAME_TYPE = 4, /**< Bad frame type */
+	WBAD_LENGTH = 5,        /**< Bad message length */
+	WBAD_ID = 6,    /**< Bad CAN ID */
+	WBAD_DATA = 7,  /**< Bad data */
+	WBAD_DLC = 8,   /**< Bad DLC */
+	WBAD_FORMAT = 9,        /**< Bad format */
+	WBAD_RESERVED = 10,      /**< Bad reserved byte */
+	WBAD_CHECKSUM = 11,      /**< Bad checksum */
+	WBAD_DATA_INDEX = 12,    /**< Bad data index */
+	WTIMEOUT = 13,   /**< Timeout */
+	DNOT_FOUND = 14,        /**< Device not found */
+	DNOT_OPEN = 15, /**< Device not open */
+	DALREADY_OPEN = 16, /**< Device already open */
+	DREAD_ERROR = 17, /**< Device read error */
+	DWRITE_ERROR = 18, /**< Device write error */
+	DCONFIG_ERROR = 19, /**< Device configuration error */
+	CAN_SDO_TIMEOUT = 20, /**< CAN SDO timeout */
+	CAN_SDO_ABORT = 21, /**< CAN SDO abort */
+	CAN_PDO_ERROR = 22, /**< CAN PDO error */
+	CAN_NMT_ERROR = 23, /**< CAN NMT error */
 	UNKNOWN = 255   /**< Unknown error */
 };
 
@@ -66,6 +67,7 @@ std::string message(int ev) const override {
 	switch (static_cast<Status>(ev)) {
 	case Status::SUCCESS: return "Success";
 	case Status::WBAD_START: return "Bad start byte";
+	case Status::WBAD_HEADER: return "Bad header byte";
 	case Status::WBAD_TYPE: return "Bad message type";
 	case Status::WBAD_FRAME_TYPE: return "Bad frame type";
 	case Status::WBAD_LENGTH: return "Bad message length";

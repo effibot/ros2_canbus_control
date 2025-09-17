@@ -26,10 +26,10 @@ class FixedFrame : public BaseFrame<FixedFrame> {
 private:
 // Storage for 20 bytes
 alignas(4) storage frame{};
-uint8_t checksum_ = 0;  // Cached checksum value
+mutable uint8_t checksum_ = 0;  // Cached checksum value
 protected:
 // Dirty bit to track modifications and trigger checksum recalculation
-bool dirty_ = false;
+mutable bool dirty_ = false;
 // Checksum calculation helper
 uint8_t calculateChecksum() const;
 
@@ -82,6 +82,7 @@ Result<bool> impl_deserialize(const std::vector<uint8_t>& data);
 Result<bool> impl_validateFrame() const;
 // * Validate specific sections during set operations
 Result<bool> impl_validateData(const payload& data) const;
+Result<bool> impl_validateDataIndex(const size_t index) const;
 Result<bool> impl_validateID(const frmID& id) const;
 Result<bool> impl_validateType(const Type& type) const;
 Result<bool> impl_validateFrameType(const FrameType& frame_type) const;

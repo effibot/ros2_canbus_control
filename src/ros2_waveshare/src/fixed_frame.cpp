@@ -177,10 +177,85 @@ Result<Type> FixedFrame::impl_getType() const {
 	return Result<Type>::success(static_cast<Type>(frame[to_uint(FixedSizeIndex::TYPE)]));
 };
 
+/**
+ * @brief Set the Type field in the frame.
+ * @param type New Type value.
+ * @return Result<bool> Success or error code.
+ */
 Result<FrameType> FixedFrame::impl_getFrameType() const {
 	return Result<FrameType>::success(
 		static_cast<FrameType>(frame[to_uint(FixedSizeIndex::FRAME_TYPE)]));
-}
+};
+
+/**
+ * @brief Set the FrameType field in the frame.
+ * @param frame_type New FrameType value.
+ * @return Result<bool> Success or error code.
+ */
+
+Result<bool> FixedFrame::impl_setFrameType(FrameType frame_type) {
+	frame[to_uint(FixedSizeIndex::FRAME_TYPE)] = to_uint8(frame_type);
+	return Result<bool>::success(true);
+};
+
+/**
+ * @brief Get the FrameFmt field from the frame.
+ * @return Result<FrameFmt> FrameFmt on success, error code on failure.
+ */
+Result<FrameFmt> FixedFrame::impl_getFrameFmt() const {
+	return Result<FrameFmt>::success(
+		static_cast<FrameFmt>(frame[to_uint(FixedSizeIndex::FRAME_FMT)]));
+};
+/**
+ * @brief Set the FrameFmt field in the frame.
+ * @param frame_fmt New FrameFmt value.
+ * @return Result<bool> Success or error code.
+ */
+Result<bool> FixedFrame::impl_setFrameFmt(FrameFmt frame_fmt) {
+	frame[to_uint(FixedSizeIndex::FRAME_FMT)] = to_uint8(frame_fmt);
+	return Result<bool>::success(true);
+};
+/**
+ * @brief Get the DLC field from the frame.
+ * @return Result<uint8_t> DLC on success, error code on failure.
+ */
+Result<uint8_t> FixedFrame::impl_getDLC() const {
+	return Result<uint8_t>::success(frame[to_uint(FixedSizeIndex::DLC)]);
+};
+/**
+ * @brief Set the DLC field in the frame.
+ * @param dlc New DLC value (0-8).
+ * @return Result<bool> Success or error code.
+ */
+Result<bool> FixedFrame::impl_setDLC(uint8_t dlc) {
+	if (dlc > 8) {
+		return Result<bool>::error(Status::WBAD_DLC);
+	}
+	frame[to_uint(FixedSizeIndex::DLC)] = dlc;
+	return Result<bool>::success(true);
+};
+/**
+ * @brief Get the ID field from the frame.
+ * @return Result<FixedFrame::frmID> ID on success, error code on failure.
+ */
+Result<FixedFrame::frmID> FixedFrame::impl_getID() const {
+	FixedFrame::frmID id{};
+	auto id_start = frame.begin() + to_uint(FixedSizeIndex::ID_0);
+	auto id_end = id_start + 4; //* this includes all 4 ID bytes
+	std::copy(id_start, id_end, id.first.begin());
+	return Result<frmID>::success(id);
+};
+/**
+ * @brief Set the ID field in the frame.
+ * @param id New ID value (32-bit).
+ * @return Result<bool> Success or error code.
+ */
+Result<bool> FixedFrame::impl_setID(const frmID& id) {
+	std::copy(id.first.begin(), id.first.end(), frame.begin() + to_uint(FixedSizeIndex::ID_0));
+	return Result<bool>::success(true);
+};
+
+// * Interface for serialization/deserialization
 
 
 
@@ -188,57 +263,37 @@ Result<FrameType> FixedFrame::impl_getFrameType() const {
 /**
  * @brief Validate the entire frame structure.
  *
+ * Before any of the checks below, we check if the dirty-bit has been set, and if so, we recalculate the checksum.
+ *
  * The following checks are performed:
  * - Start byte is correct (0xAA)
  * - Header byte is correct (0x55)
- * - Type field is valid for FixedFrame (DATA_FIXED)
- * - FrameType field is valid (STD_FIXED or EXT_FIXED)
- * - FrameFmt field is valid (DATA_FIXED or REMOTE_FIXED)
- * - ID field is valid (32-bit, with 16-bit restriction for STD_FIXED)
- * - DLC field is in range (0-8)
+ * - [Skipped] Type field is valid for FixedFrame (DATA_FIXED)
+ * - [Skipped] FrameType field is valid (STD_FIXED or EXT_FIXED)
+ * - [Skipped] FrameFmt field is valid (DATA_FIXED or REMOTE_FIXED)
+ * - [Skipped] ID field is valid (32-bit, with 16-bit restriction for STD_FIXED)
+ * - DLC field is in range (0-8) and consistent with data bytes
  * - Reserved byte is correct (0x00)
  * - Checksum matches calculated value
  *
+ * Skipped checks are omitted as they are enforced at set time via the respective validate methods. This avoids redundant validation.
  * @return Result<bool>
  */
 Result<bool> FixedFrame::impl_validateFrame() const {
-	if (frame[to_uint(FixedSizeIndex::START)] != START_BYTE) {
+	// Recalculate checksum if dirty
+	if (dirty_) {
+		checksum_ = calculateChecksum();
+		dirty_ = false;
+	}
+
+	// Validate start and header bytes - just in case they were modified directly
+	if (frame[to_uint(FixedSizeIndex::START)] != to_uint8(Constants::START_BYTE)) {
 		return Result<bool>::error(Status::WBAD_START);
 	}
 	if (frame[to_uint(FixedSizeIndex::HEADER)] != to_uint8(Constants::MSG_HEADER)) {
-		return Result<bool>::error(Status::WBAD_START);
+		return Result<bool>::error(Status::WBAD_HEADER);
 	}
-	// Validate Type
-	auto type_res = impl_getType();
-	if (type_res.fail()) {
-		return Result<bool>::error(Status::WBAD_TYPE);
-	}
-	auto type = type_res.value;
-	auto type_validation = impl_validateType(type);
-	if (type_validation.fail()) {
-		return Result<bool>::error(Status::WBAD_TYPE);
-	}
-	// Validate FrameType
-	auto frame_type = static_cast<FrameType>(frame[to_uint(FixedSizeIndex::FRAME_TYPE)]);
-	auto frame_type_validation = impl_validateFrameType(frame_type);
-	if (frame_type_validation.fail()) {
-		return Result<bool>::error(Status::WBAD_FRAME_TYPE);
-	}
-	// Validate FrameFmt
-	auto frame_fmt = static_cast<FrameFmt>(frame[to_uint(FixedSizeIndex::FRAME_FMT)]);
-	auto frame_fmt_validation = impl_validateFrameFmt(frame_fmt);
-	if (frame_fmt_validation.fail()) {
-		return Result<bool>::error(Status::WBAD_FORMAT);
-	}
-	// Validate ID
-	frmID id{};
-	std::copy(frame.begin() + to_uint(FixedSizeIndex::ID_0),
-	          frame.begin() + to_uint(FixedSizeIndex::ID_3) + 1,
-	          id.first.begin());
-	auto id_validation = impl_validateID(id);
-	if (id_validation.fail()) {
-		return Result<bool>::error(Status::WBAD_ID);
-	}
+
 	// Validate DLC
 	auto dlc = frame[to_uint(FixedSizeIndex::DLC)];
 	auto dlc_validation = impl_validateDLC(dlc);
@@ -274,9 +329,25 @@ Result<bool> FixedFrame::impl_validateData(const payload& data) const {
 }
 
 /**
+ * @brief Validate the data index before updating the frame.
+ *
+ * For a fixed frame, we only need to check that the index is in range (0-7).
+ *
+ * @param index
+ * @return Result<bool>
+ */
+Result<bool> FixedFrame::impl_validateDataIndex(const size_t index) const {
+	if (index > 7) {
+		return Result<bool>::error(Status::WBAD_DATA_INDEX);
+	}
+	return Result<bool>::success(true);
+}
+
+/**
  * @brief Validate the ID field before updating the frame.
  *
  * For a fixed frame, we accept all 32-bit IDs but if the FrameType is STD_FIXED, we only accept 16-bit IDs.
+ *! If you want to set a specific ID, first check the FrameType and adjust accordingly.
  *
  * @param id
  * @return Result<bool>
@@ -355,6 +426,12 @@ Result<bool> FixedFrame::impl_validateFrameFmt(const FrameFmt& frame_fmt) const 
 Result<bool> FixedFrame::impl_validateDLC(const uint8_t& dlc) const {
 	if (dlc > 8) {
 		return Result<bool>::error(Status::WBAD_DLC);
+	}
+	// Check that data bytes beyond DLC are zero
+	for (size_t i = dlc; i < 8; ++i) {
+		if (frame[to_uint(FixedSizeIndex::DATA_0) + i] != 0) {
+			return Result<bool>::error(Status::WBAD_DLC);
+		}
 	}
 	return Result<bool>::success(true);
 }

@@ -84,9 +84,6 @@ Derived& derived() {
 const Derived& derived() const {
 	return static_cast<const Derived&>(*this);
 }
-protected:
-// start byte for frame synchronization
-static constexpr std::uint8_t START_BYTE = Constants::START_BYTE;
 
 public:
 // Constructors
@@ -158,7 +155,7 @@ Result<bool> setData(const payload& new_data){
 };
 Result<bool> setData(size_t index, uint8_t value){
 	// * invoke the derived validateData method
-	auto validation = validateData(index);
+	auto validation = validateDataIndex(index);
 	if (validation.fail()) {
 		return Result<bool>::error(validation.status);
 	}
@@ -257,6 +254,9 @@ Result<bool> validateFrame() const {
 // * Validate specific sections during set operations
 Result<bool> validateData(const payload& data) const {
 	return derived().impl_validateData(data);
+};
+Result<bool> validateDataIndex(const size_t index) const {
+	return derived().impl_validateDataIndex(index);
 };
 Result<bool> validateID(const frmID& id) const {
 	return derived().impl_validateID(id);
