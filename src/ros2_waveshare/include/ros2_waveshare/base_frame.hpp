@@ -17,6 +17,14 @@
 
 namespace USBCANBridge {
 // * Smart return type with error code
+/**
+ * @brief Result type for function return values.
+ *
+ * Wraps a value of type T and an error code.
+ * Provides convenience methods for checking success/failure.
+ *
+ * @tparam T
+ */
 template <typename T>
 struct Result {
 	T value;
@@ -60,6 +68,12 @@ struct FrameTraits;
 
 
 // * templating to allow static polymorphism via CRTP
+/**
+ * @brief Curiously Recurring Template Pattern (CRTP) base class for frame types.
+ * Provides common interface and delegates implementation to Derived class.
+ *
+ * @tparam Derived
+ */
 template <typename Derived>
 class BaseFrame {
 private:
@@ -83,7 +97,7 @@ explicit BaseFrame() {
 using traits = FrameTraits<Derived>;
 using storage = typename traits::StorageType;
 using payload = typename traits::PayloadPair;
-using id_t = typename traits::IDPair;
+using frmID = typename traits::IDPair;
 // Disable copy/assignment to avoid slicing
 BaseFrame(const BaseFrame&) = delete;
 BaseFrame& operator=(const BaseFrame&) = delete;
@@ -130,7 +144,7 @@ std::size_t size() const {
 Result<payload> getData() const {
 	return derived().impl_getData();
 };
-Result<payload> getData(size_t index) const {
+Result<uint8_t> getData(size_t index) const {
 	return derived().impl_getData(index);
 };
 Result<bool> setData(const payload& new_data){
@@ -142,6 +156,16 @@ Result<bool> setData(const payload& new_data){
 	// * if validation passed, call the implementation
 	return derived().impl_setData(new_data);
 };
+Result<bool> setData(size_t index, uint8_t value){
+	// * invoke the derived validateData method
+	auto validation = validateData(index);
+	if (validation.fail()) {
+		return Result<bool>::error(validation.status);
+	}
+	// * if validation passed, call the implementation
+	return derived().impl_setData(index, value);
+};
+
 // * Interface for type manipulation
 Result<Type> getType() const {
 	return derived().impl_getType();
@@ -195,10 +219,10 @@ Result<bool> setDLC(uint8_t dlc) {
 	return derived().impl_setDLC(dlc);
 };
 //* Interface for ID manipulation
-Result<id_t> getID() const {
+Result<frmID> getID() const {
 	return derived().impl_getID();
 };
-Result<bool> setID(const id_t& id) {
+Result<bool> setID(const frmID& id) {
 	// * invoke the derived validateID method
 	auto validation = validateID(id);
 	if (validation.fail()) {
@@ -230,26 +254,24 @@ Result<bool> deserialize(const std::vector<uint8_t>& data) {
 Result<bool> validateFrame() const {
 	return derived().impl_validateFrame();
 };
-Result<bool> validateData() const {
-	return derived().impl_validateData();
+// * Validate specific sections during set operations
+Result<bool> validateData(const payload& data) const {
+	return derived().impl_validateData(data);
 };
-Result<bool> validateID() const {
-	return derived().impl_validateID();
+Result<bool> validateID(const frmID& id) const {
+	return derived().impl_validateID(id);
 };
-Result<bool> validateType(Type type) const {
+Result<bool> validateType(const Type& type) const {
 	return derived().impl_validateType(type);
 };
-Result<bool> validateFrameType(FrameType frame_type) const {
+Result<bool> validateFrameType(const FrameType& frame_type) const {
 	return derived().impl_validateFrameType(frame_type);
 };
-Result<bool> validateFrameFmt(FrameFmt frame_fmt) const {
+Result<bool> validateFrameFmt(const FrameFmt& frame_fmt) const {
 	return derived().impl_validateFrameFmt(frame_fmt);
 };
-Result<bool> validateDLC(uint8_t dlc) const {
+Result<bool> validateDLC(const uint8_t& dlc) const {
 	return derived().impl_validateDLC(dlc);
-};
-Result<bool> validateID(const id_t& id) const {
-	return derived().impl_validateID(id);
 };
 };
 } // namespace USBCANBridge

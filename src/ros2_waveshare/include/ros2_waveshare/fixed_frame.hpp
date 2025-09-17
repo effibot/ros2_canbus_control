@@ -57,8 +57,9 @@ const uint8_t* impl_end() const;
 std::size_t impl_size() const;
 // * Interface for data manipulation
 Result<payload> impl_getData() const;
-Result<payload> impl_getData(size_t index) const;
+Result<uint8_t> impl_getData(size_t index) const;
 Result<bool> impl_setData(const payload& new_data);
+Result<bool> impl_setData(size_t index, uint8_t value);
 // * Interface for type manipulation
 Result<Type> impl_getType() const;
 Result<bool> impl_setType(Type type);
@@ -72,19 +73,20 @@ Result<bool> impl_setFrameFmt(FrameFmt frame_fmt);
 Result<uint8_t> impl_getDLC() const;
 Result<bool> impl_setDLC(uint8_t dlc);
 //* Interface for ID manipulation
-Result<id_t> impl_getID() const;
-Result<bool> impl_setID(const id_t& id);
+Result<frmID> impl_getID() const;
+Result<bool> impl_setID(const frmID& id);
 // * Interface for serialization/deserialization
 Result<storage> impl_serialize() const;
 Result<bool> impl_deserialize(const std::vector<uint8_t>& data);
 // * Interface for frame validation
 Result<bool> impl_validateFrame() const;
-Result<bool> impl_validateData() const;
-Result<bool> impl_validateID() const;
-Result<bool> impl_validateType(Type type) const;
-Result<bool> impl_validateFrameType(FrameType frame_type) const;
-Result<bool> impl_validateFrameFmt(FrameFmt frame_fmt) const;
-Result<bool> impl_validateDLC(uint8_t dlc) const;
+// * Validate specific sections during set operations
+Result<bool> impl_validateData(const payload& data) const;
+Result<bool> impl_validateID(const frmID& id) const;
+Result<bool> impl_validateType(const Type& type) const;
+Result<bool> impl_validateFrameType(const FrameType& frame_type) const;
+Result<bool> impl_validateFrameFmt(const FrameFmt& frame_fmt) const;
+Result<bool> impl_validateDLC(const uint8_t& dlc) const;
 // * Additional Checksum validation
 Result<bool> validateChecksum() const {
 	if (checksum_ == calculateChecksum()) {

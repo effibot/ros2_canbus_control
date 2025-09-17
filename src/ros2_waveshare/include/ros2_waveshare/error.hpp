@@ -29,24 +29,26 @@ enum class Status : std::uint16_t {
 	SUCCESS = 0,    /**< No error */
 	WBAD_START = 1, /**< Bad start byte */
 	WBAD_TYPE = 2,  /**< Bad message type */
-	WBAD_LENGTH = 3,        /**< Bad message length */
-	WBAD_ID = 4,    /**< Bad CAN ID */
-	WBAD_DATA = 5,  /**< Bad data */
-	WBAD_DLC = 6,   /**< Bad DLC */
-	WBAD_FORMAT = 7,        /**< Bad format */
-	WBAD_CHECKSUM = 8,      /**< Bad checksum */
-	WBAD_DATA_INDEX = 9,    /**< Bad data index */
-	WTIMEOUT = 10,   /**< Timeout */
-	DNOT_FOUND = 11,        /**< Device not found */
-	DNOT_OPEN = 12, /**< Device not open */
-	DALREADY_OPEN = 13, /**< Device already open */
-	DREAD_ERROR = 14, /**< Device read error */
-	DWRITE_ERROR = 15, /**< Device write error */
-	DCONFIG_ERROR = 16, /**< Device configuration error */
-	CAN_SDO_TIMEOUT = 17, /**< CAN SDO timeout */
-	CAN_SDO_ABORT = 18, /**< CAN SDO abort */
-	CAN_PDO_ERROR = 19, /**< CAN PDO error */
-	CAN_NMT_ERROR = 20, /**< CAN NMT error */
+	WBAD_FRAME_TYPE = 3, /**< Bad frame type */
+	WBAD_LENGTH = 4,        /**< Bad message length */
+	WBAD_ID = 5,    /**< Bad CAN ID */
+	WBAD_DATA = 6,  /**< Bad data */
+	WBAD_DLC = 7,   /**< Bad DLC */
+	WBAD_FORMAT = 8,        /**< Bad format */
+	WBAD_RESERVED = 9,      /**< Bad reserved byte */
+	WBAD_CHECKSUM = 10,      /**< Bad checksum */
+	WBAD_DATA_INDEX = 11,    /**< Bad data index */
+	WTIMEOUT = 12,   /**< Timeout */
+	DNOT_FOUND = 13,        /**< Device not found */
+	DNOT_OPEN = 14, /**< Device not open */
+	DALREADY_OPEN = 15, /**< Device already open */
+	DREAD_ERROR = 16, /**< Device read error */
+	DWRITE_ERROR = 17, /**< Device write error */
+	DCONFIG_ERROR = 18, /**< Device configuration error */
+	CAN_SDO_TIMEOUT = 19, /**< CAN SDO timeout */
+	CAN_SDO_ABORT = 20, /**< CAN SDO abort */
+	CAN_PDO_ERROR = 21, /**< CAN PDO error */
+	CAN_NMT_ERROR = 22, /**< CAN NMT error */
 	UNKNOWN = 255   /**< Unknown error */
 };
 
@@ -65,11 +67,13 @@ std::string message(int ev) const override {
 	case Status::SUCCESS: return "Success";
 	case Status::WBAD_START: return "Bad start byte";
 	case Status::WBAD_TYPE: return "Bad message type";
+	case Status::WBAD_FRAME_TYPE: return "Bad frame type";
 	case Status::WBAD_LENGTH: return "Bad message length";
 	case Status::WBAD_ID: return "Bad CAN ID";
 	case Status::WBAD_DATA: return "Bad data";
 	case Status::WBAD_DLC: return "Bad DLC";
 	case Status::WBAD_FORMAT: return "Bad format";
+	case Status::WBAD_RESERVED: return "Bad reserved byte";
 	case Status::WBAD_CHECKSUM: return "Bad checksum";
 	case Status::WBAD_DATA_INDEX: return "Bad data index";
 	case Status::WTIMEOUT: return "Timeout";
