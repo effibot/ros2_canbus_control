@@ -39,17 +39,18 @@ enum class Status : std::uint16_t {
 	WBAD_RESERVED = 10,      /**< Bad reserved byte */
 	WBAD_CHECKSUM = 11,      /**< Bad checksum */
 	WBAD_DATA_INDEX = 12,    /**< Bad data index */
-	WTIMEOUT = 13,   /**< Timeout */
-	DNOT_FOUND = 14,        /**< Device not found */
-	DNOT_OPEN = 15, /**< Device not open */
-	DALREADY_OPEN = 16, /**< Device already open */
-	DREAD_ERROR = 17, /**< Device read error */
-	DWRITE_ERROR = 18, /**< Device write error */
-	DCONFIG_ERROR = 19, /**< Device configuration error */
-	CAN_SDO_TIMEOUT = 20, /**< CAN SDO timeout */
-	CAN_SDO_ABORT = 21, /**< CAN SDO abort */
-	CAN_PDO_ERROR = 22, /**< CAN PDO error */
-	CAN_NMT_ERROR = 23, /**< CAN NMT error */
+	WBAD_CAN_MODE = 13,    /**< Bad CAN mode */
+	WTIMEOUT = 14,   /**< Timeout */
+	DNOT_FOUND = 15,        /**< Device not found */
+	DNOT_OPEN = 16, /**< Device not open */
+	DALREADY_OPEN = 17, /**< Device already open */
+	DREAD_ERROR = 18, /**< Device read error */
+	DWRITE_ERROR = 19, /**< Device write error */
+	DCONFIG_ERROR = 20, /**< Device configuration error */
+	CAN_SDO_TIMEOUT = 21, /**< CAN SDO timeout */
+	CAN_SDO_ABORT = 22, /**< CAN SDO abort */
+	CAN_PDO_ERROR = 23, /**< CAN PDO error */
+	CAN_NMT_ERROR = 24, /**< CAN NMT error */
 	UNKNOWN = 255   /**< Unknown error */
 };
 
@@ -78,6 +79,7 @@ std::string message(int ev) const override {
 	case Status::WBAD_RESERVED: return "Bad reserved byte";
 	case Status::WBAD_CHECKSUM: return "Bad checksum";
 	case Status::WBAD_DATA_INDEX: return "Bad data index";
+	case Status::WBAD_CAN_MODE: return "Bad CAN mode";
 	case Status::WTIMEOUT: return "Timeout";
 	case Status::DNOT_FOUND: return "Device not found";
 	case Status::DNOT_OPEN: return "Device not open";

@@ -22,6 +22,7 @@ uint8_t FixedFrame::calculateChecksum() const {
 };
 
 // * Index access operators
+// ! This operators should not be used directly because they do not perform any validation and they do not set the dirty flag for checksum recalculation
 /**
  * @brief Subscript operator for direct byte access without bounds checking.
  * @param index Byte index (0-19).
@@ -130,40 +131,56 @@ Result<FixedFrame::payload> FixedFrame::impl_getData() const {
  * @return Result<FixedFrame::payload> Payload data with DLC on success, error code on failure.
  */
 Result<uint8_t> FixedFrame::impl_getData(size_t index) const {
-	if (index >= 8) {
+	// Validate index for safe access
+	if (index >= 8 || index < 0) {
 		return Result<uint8_t>::error(Status::WBAD_DATA_INDEX);
 	}
 	return Result<uint8_t>::success(frame[to_uint(FixedSizeIndex::DATA_0) + index]);
 };
-
+/**
+ * @brief Set the data and DLC fields in the frame.
+ *
+ * Given a payload (data array + DLC), updates the data bytes and DLC in the frame. If DLC is less than 8, zero-fills remaining data bytes. If DLC is greater than 8, returns WBAD_DLC error.
+ *
+ * @param new_data
+ * @return Result<bool>
+ */
 Result<bool> FixedFrame::impl_setData(const payload& new_data) {
+	// Validate DLC range
 	if (new_data.second > 8) {
 		return Result<bool>::error(Status::WBAD_DLC);
 	}
-	// Copy new data bytes
+	// Copy new bytes into the frame data field
 	auto frame_start = frame.begin() + to_uint(FixedSizeIndex::DATA_0);
 	std::copy(new_data.first.begin(), new_data.first.begin() + new_data.second, frame_start);
 	// Zero-fill unused bytes
 	std::fill(frame_start + new_data.second, frame_start + 8, 0);
 	// Update DLC
 	frame[to_uint(FixedSizeIndex::DLC)] = new_data.second;
+	// Mark dirty for checksum recalculation
+	dirty_ = true;
+	// Success
 	return Result<bool>::success(true);
 };
 
 /**
- * @brief Set the data field in the frame at the specified index.
+ * @brief Set the data field in the frame at the specified index and not over the maximum size defined by DLC. If you want to set a greater part of the data field, use setData with a full payload.
  *
- * If index is out of range (>=8), returns WBAD_DATA_INDEX error.
+ * If index is out of range (>=DLC), returns WBAD_DATA_INDEX error.
  *
- * @param index Data byte index (0-7).
+ * @param index Data byte index [0-DLC).
  * @param value New value for the data byte.
  * @return Result<bool> Success or error code.
  */
 Result<bool> FixedFrame::impl_setData(size_t index, uint8_t value) {
-	if (index >= 8) {
+	// Validate index for safe access
+	if (index >= frame[to_uint(FixedSizeIndex::DLC)] || index < 0) {
 		return Result<bool>::error(Status::WBAD_DATA_INDEX);
 	}
 	frame[to_uint(FixedSizeIndex::DATA_0) + index] = value;
+	// Mark dirty for checksum recalculation
+	dirty_ = true;
+	// Success
 	return Result<bool>::success(true);
 };
 
@@ -195,6 +212,9 @@ Result<FrameType> FixedFrame::impl_getFrameType() const {
 
 Result<bool> FixedFrame::impl_setFrameType(FrameType frame_type) {
 	frame[to_uint(FixedSizeIndex::FRAME_TYPE)] = to_uint8(frame_type);
+	// Mark dirty for checksum recalculation
+	dirty_ = true;
+	// Success
 	return Result<bool>::success(true);
 };
 
@@ -213,6 +233,9 @@ Result<FrameFmt> FixedFrame::impl_getFrameFmt() const {
  */
 Result<bool> FixedFrame::impl_setFrameFmt(FrameFmt frame_fmt) {
 	frame[to_uint(FixedSizeIndex::FRAME_FMT)] = to_uint8(frame_fmt);
+	// Mark dirty for checksum recalculation
+	dirty_ = true;
+	// Success
 	return Result<bool>::success(true);
 };
 /**
@@ -222,18 +245,7 @@ Result<bool> FixedFrame::impl_setFrameFmt(FrameFmt frame_fmt) {
 Result<uint8_t> FixedFrame::impl_getDLC() const {
 	return Result<uint8_t>::success(frame[to_uint(FixedSizeIndex::DLC)]);
 };
-/**
- * @brief Set the DLC field in the frame.
- * @param dlc New DLC value (0-8).
- * @return Result<bool> Success or error code.
- */
-Result<bool> FixedFrame::impl_setDLC(uint8_t dlc) {
-	if (dlc > 8) {
-		return Result<bool>::error(Status::WBAD_DLC);
-	}
-	frame[to_uint(FixedSizeIndex::DLC)] = dlc;
-	return Result<bool>::success(true);
-};
+
 /**
  * @brief Get the ID field from the frame.
  * @return Result<FixedFrame::frmID> ID on success, error code on failure.
@@ -252,6 +264,9 @@ Result<FixedFrame::frmID> FixedFrame::impl_getID() const {
  */
 Result<bool> FixedFrame::impl_setID(const frmID& id) {
 	std::copy(id.first.begin(), id.first.end(), frame.begin() + to_uint(FixedSizeIndex::ID_0));
+	// Mark dirty for checksum recalculation
+	dirty_ = true;
+	// Success
 	return Result<bool>::success(true);
 };
 
@@ -261,13 +276,13 @@ Result<bool> FixedFrame::impl_setID(const frmID& id) {
 
 // * Interface for frame validation
 /**
- * @brief Validate the entire frame structure.
+ * @brief Validate the entire frame structure of the current object.
  *
  * Before any of the checks below, we check if the dirty-bit has been set, and if so, we recalculate the checksum.
  *
  * The following checks are performed:
- * - Start byte is correct (0xAA)
- * - Header byte is correct (0x55)
+ * - [Skipped] Start byte is correct (0xAA)
+ * - [Skipped] Header byte is correct (0x55)
  * - [Skipped] Type field is valid for FixedFrame (DATA_FIXED)
  * - [Skipped] FrameType field is valid (STD_FIXED or EXT_FIXED)
  * - [Skipped] FrameFmt field is valid (DATA_FIXED or REMOTE_FIXED)
@@ -286,24 +301,17 @@ Result<bool> FixedFrame::impl_validateFrame() const {
 		dirty_ = false;
 	}
 
-	// Validate start and header bytes - just in case they were modified directly
-	if (frame[to_uint(FixedSizeIndex::START)] != to_uint8(Constants::START_BYTE)) {
-		return Result<bool>::error(Status::WBAD_START);
-	}
-	if (frame[to_uint(FixedSizeIndex::HEADER)] != to_uint8(Constants::MSG_HEADER)) {
-		return Result<bool>::error(Status::WBAD_HEADER);
-	}
-
-	// Validate DLC
-	auto dlc = frame[to_uint(FixedSizeIndex::DLC)];
-	auto dlc_validation = impl_validateDLC(dlc);
-	if (dlc_validation.fail()) {
-		return Result<bool>::error(Status::WBAD_DLC);
+	// Validate data and DLC consistency
+	auto data_res = impl_getData();
+	auto data_validation = impl_validateData(data_res.value);
+	if (data_validation.fail()) {
+		return Result<bool>::error(Status::WBAD_DATA);
 	}
 	// Validate reserved byte
 	if (frame[to_uint(FixedSizeIndex::RESERVED)] != to_uint8(Constants::RESERVED0)) {
 		return Result<bool>::error(Status::WBAD_RESERVED);
 	}
+
 	// Validate checksum
 	auto checksum_validation = validateChecksum();
 	if (checksum_validation.fail()) {
@@ -322,23 +330,67 @@ Result<bool> FixedFrame::impl_validateFrame() const {
  * @return Result<bool>
  */
 Result<bool> FixedFrame::impl_validateData(const payload& data) const {
-	if (data.second > 8) {
+	if (data.second > traits::DATA_SIZE) {
 		return Result<bool>::error(Status::WBAD_DATA);
+	}
+	// * check that bytes beyond DLC are zero
+	for (size_t i = data.second; i < 8; ++i) {
+		if (data.first[i] != 0) {
+			return Result<bool>::error(Status::WBAD_DATA);
+		}
 	}
 	return Result<bool>::success(true);
 }
 
 /**
- * @brief Validate the data index before updating the frame.
+ * @brief Validate the data index before accessing it.
  *
- * For a fixed frame, we only need to check that the index is in range (0-7).
+ * For a fixed frame, we only allow valid data indices (0-7).
  *
  * @param index
  * @return Result<bool>
  */
-Result<bool> FixedFrame::impl_validateDataIndex(const size_t index) const {
-	if (index > 7) {
+Result<bool> FixedFrame::impl_validateDataIndex(size_t index) const {
+	if (index >= 8) {
 		return Result<bool>::error(Status::WBAD_DATA_INDEX);
+	}
+	return Result<bool>::success(true);
+};
+
+/**
+ * @brief Validate the header section of the current frame.
+ *
+ * Checks start byte and header byte.
+ *
+ * @return Result<bool>
+ */
+Result<bool> FixedFrame::impl_validateHeader() const {
+	if (frame[to_uint(FixedSizeIndex::START)] != to_uint8(Constants::START_BYTE)) {
+		return Result<bool>::error(Status::WBAD_START);
+	}
+	if (frame[to_uint(FixedSizeIndex::HEADER)] != to_uint8(Constants::MSG_HEADER)) {
+		return Result<bool>::error(Status::WBAD_HEADER);
+	}
+	return Result<bool>::success(true);
+}
+
+/**
+ * @brief Validate the header section of a received packet before deserialization.
+ *
+ * Checks start byte and header byte.
+ *
+ * @param packet
+ * @return Result<bool>
+ */
+Result<bool> FixedFrame::impl_validateHeader(const std::vector<uint8_t>& packet) const {
+	if (packet.size() != frame.size()) {
+		return Result<bool>::error(Status::WBAD_LENGTH);
+	}
+	if (packet[to_uint(FixedSizeIndex::START)] != to_uint8(Constants::START_BYTE)) {
+		return Result<bool>::error(Status::WBAD_START);
+	}
+	if (packet[to_uint(FixedSizeIndex::HEADER)] != to_uint8(Constants::MSG_HEADER)) {
+		return Result<bool>::error(Status::WBAD_HEADER);
 	}
 	return Result<bool>::success(true);
 }
@@ -415,25 +467,6 @@ Result<bool> FixedFrame::impl_validateFrameFmt(const FrameFmt& frame_fmt) const 
 		return Result<bool>::error(Status::WBAD_FORMAT);
 	}
 }
-/**
- * @brief Validate the DLC field before updating the frame.
- *
- * For a fixed frame, we only accept DLC values in range 0-8.
- *
- * @param dlc
- * @return Result<bool>
- */
-Result<bool> FixedFrame::impl_validateDLC(const uint8_t& dlc) const {
-	if (dlc > 8) {
-		return Result<bool>::error(Status::WBAD_DLC);
-	}
-	// Check that data bytes beyond DLC are zero
-	for (size_t i = dlc; i < 8; ++i) {
-		if (frame[to_uint(FixedSizeIndex::DATA_0) + i] != 0) {
-			return Result<bool>::error(Status::WBAD_DLC);
-		}
-	}
-	return Result<bool>::success(true);
-}
+
 
 };// namespace USBCANBridge

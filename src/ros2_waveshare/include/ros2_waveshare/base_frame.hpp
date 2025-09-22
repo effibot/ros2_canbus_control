@@ -43,7 +43,7 @@ struct Result {
 	bool operator!() const {
 		return !ok();
 	}
-	static std::string to_string() {
+	std::string to_string() {
 		return status.message();
 	}
 	static Result success(T val) {
@@ -88,6 +88,7 @@ const Derived& derived() const {
 public:
 // Constructors
 explicit BaseFrame() {
+	// Default constructor
 };
 
 // Bring traits into scope and define useful types
@@ -202,19 +203,11 @@ Result<bool> setFrameFmt(FrameFmt frame_fmt) {
 	// * if validation passed, call the implementation
 	return derived().impl_setFrameFmt(frame_fmt);
 };
-// * Interface for DLC manipulation
+// * Interface for DLC manipulation - no setter as DLC is set via setData
 Result<uint8_t> getDLC() const {
 	return derived().impl_getDLC();
 };
-Result<bool> setDLC(uint8_t dlc) {
-	// * invoke the derived validateDLC method
-	auto validation = validateDLC(dlc);
-	if (validation.fail()) {
-		return Result<bool>::error(validation.status);
-	}
-	// * if validation passed, call the implementation
-	return derived().impl_setDLC(dlc);
-};
+
 //* Interface for ID manipulation
 Result<frmID> getID() const {
 	return derived().impl_getID();
@@ -238,24 +231,27 @@ Result<storage> serialize() const {
 	// * If validation passed, call the implementation
 	return derived().impl_serialize();
 };
-Result<bool> deserialize(const std::vector<uint8_t>& data) {
-	// * invoke the derived validateFrame method
-	auto validation = validateFrameData(data);
-	if (validation.fail()) {
-		return Result<bool>::error(validation.status);
+Result<bool> deserialize(const std::vector<uint8_t>& packet) {
+	// * Invoke the validateHeader method first
+	auto header_validation = validateHeader(packet);
+	if (header_validation.fail()) {
+		return Result<bool>::error(header_validation.status);
 	}
 	// * if validation passed, call the implementation
-	return derived().impl_deserialize(data);
+	return derived().impl_deserialize(packet);
 };
 // * Interface for frame validation
 Result<bool> validateFrame() const {
 	return derived().impl_validateFrame();
 };
-// * Validate specific sections during set operations
+// * Validate specific sections during set operations and deserialization
+Result<bool> validateHeader(const std::vector<uint8_t>& packet) const {
+	return derived().impl_validateHeader(packet);
+};
 Result<bool> validateData(const payload& data) const {
 	return derived().impl_validateData(data);
 };
-Result<bool> validateDataIndex(const size_t index) const {
+Result<bool> validateDataIndex(size_t index) const {
 	return derived().impl_validateDataIndex(index);
 };
 Result<bool> validateID(const frmID& id) const {
@@ -270,8 +266,6 @@ Result<bool> validateFrameType(const FrameType& frame_type) const {
 Result<bool> validateFrameFmt(const FrameFmt& frame_fmt) const {
 	return derived().impl_validateFrameFmt(frame_fmt);
 };
-Result<bool> validateDLC(const uint8_t& dlc) const {
-	return derived().impl_validateDLC(dlc);
-};
+
 };
 } // namespace USBCANBridge

@@ -105,7 +105,7 @@ enum class Type : std::uint8_t {
 	DATA_FIXED = 0x01,    ///< Fixed-length data frame (20 bytes total)
 	DATA_VAR = 0xC0,      ///< Variable-length data frame (up to 8 data bytes)
 	CONF_FIXED = 0x02,    ///< Fixed-length configuration frame
-	CONF = 0x12       ///< Variable-length configuration frame
+	CONF_VAR = 0x12       ///< Variable-length configuration frame
 };
 
 /**
@@ -243,6 +243,37 @@ enum class FixedSizeIndex : std::size_t {
 	CHECKSUM = 19     ///< Position of checksum byte (frame validation)
 };
 
+/**
+ * @brief Byte position indices for the Configuration Command frame.
+ *
+ * It uses most of the same structure as FixedSizeIndex, but with some differences. See the notes below.
+ * @note Frame structure (20 bytes total):
+ * [START][HEADER][TYPE][CAN_BAUD][FRAME_TYPE][FILTER_ID1-FILTER_ID4][MASK_ID1-MASK_ID4][CAN_MODE][AUTO_RTX][BACKUP0-BACKUP3][CHECKSUM]
+ */
+enum class ConfigCommandIndex : std::size_t {
+	START = 0,        ///< Position of start delimiter byte (0xAA)
+	HEADER = 1,       ///< Position of header byte (0x55)
+	TYPE = 2,         ///< Position of frame type byte (Type enum)
+	CAN_BAUD = 3,    ///< Position of CAN baud rate byte (CANBaud enum)
+	FRAME_TYPE = 4,   ///< Position of CAN frame type byte (FrameType enum)
+	FILTER_ID_1 = 5,         ///< Position of CAN ID byte 0 (least significant byte)
+	FILTER_ID_2 = 6,         ///< Position of CAN ID byte 1
+	FILTER_ID_3 = 7,         ///< Position of CAN ID byte 2
+	FILTER_ID_4 = 8,         ///< Position of CAN ID byte 3 (most significant byte)
+	MASK_ID_1 = 9,          ///< Position of CAN ID byte 0 (least significant byte)
+	MASK_ID_2 = 10,         ///< Position of CAN ID byte 1
+	MASK_ID_3 = 11,         ///< Position of CAN ID byte 2
+	MASK_ID_4 = 12,         ///< Position of CAN ID byte 3 (most significant byte)
+	CAN_MODE = 13,          ///< Position of CAN mode byte (CANMode enum)
+	AUTO_RTX = 14,          ///< Position of automatic retransmission control byte (RTX enum)
+	BACKUP_0 = 15,          ///< Position of backup byte
+	BACKUP_1 = 16,          ///< Position of backup byte
+	BACKUP_2 = 17,          ///< Position of backup byte
+	BACKUP_3 = 18,          ///< Position of backup byte
+	CHECKSUM = 19           ///< Position of checksum byte (frame validation)
+};
+
+
 // Conversion helpers
 constexpr uint8_t to_uint8(Constants v) {
 	return static_cast<uint8_t>(v);
@@ -259,5 +290,16 @@ constexpr uint8_t to_uint8(FrameFmt v) {
 constexpr std::size_t to_uint(FixedSizeIndex v) {
 	return static_cast<std::size_t>(v);
 }
-
+constexpr std::size_t to_uint(ConfigCommandIndex v) {
+	return static_cast<std::size_t>(v);
+}
+constexpr uint8_t to_uint8(CANBaud v) {
+	return static_cast<uint8_t>(v);
+}
+constexpr uint8_t to_uint8(CANMode v) {
+	return static_cast<uint8_t>(v);
+}
+constexpr uint8_t to_uint8(RTX v) {
+	return static_cast<uint8_t>(v);
+}
 } // namespace USBCANBridge

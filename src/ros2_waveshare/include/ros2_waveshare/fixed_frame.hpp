@@ -1,7 +1,6 @@
 #pragma once
 
 #include "base_frame.hpp"
-#include "common.hpp"
 #include <array>
 #include <cstdint>
 #include <cstddef>
@@ -24,10 +23,11 @@ struct FrameTraits<FixedFrame> {
 // * Fixed size frame class (20 bytes total)
 class FixedFrame : public BaseFrame<FixedFrame> {
 private:
+
+protected:
 // Storage for 20 bytes
 alignas(4) storage frame{};
 mutable uint8_t checksum_ = 0;  // Cached checksum value
-protected:
 // Dirty bit to track modifications and trigger checksum recalculation
 mutable bool dirty_ = false;
 // Checksum calculation helper
@@ -37,6 +37,7 @@ public:
 // Constructors
 FixedFrame() : BaseFrame() {
 	// Initialize fixed frame structure
+	frame[to_uint(FixedSizeIndex::START)] = to_uint8(Constants::START_BYTE);
 	frame[to_uint(FixedSizeIndex::HEADER)] = to_uint8(Constants::MSG_HEADER);
 	frame[to_uint(FixedSizeIndex::TYPE)] = to_uint8(Type::DATA_FIXED);
 	frame[to_uint(FixedSizeIndex::FRAME_TYPE)] = to_uint8(FrameType::STD_FIXED);
@@ -69,9 +70,8 @@ Result<bool> impl_setFrameType(FrameType frame_type);
 // * Interface for frame format manipulation
 Result<FrameFmt> impl_getFrameFmt() const;
 Result<bool> impl_setFrameFmt(FrameFmt frame_fmt);
-// * Interface for DLC manipulation
+// * Interface for DLC manipulation - no setter as DLC is set via setData
 Result<uint8_t> impl_getDLC() const;
-Result<bool> impl_setDLC(uint8_t dlc);
 //* Interface for ID manipulation
 Result<frmID> impl_getID() const;
 Result<bool> impl_setID(const frmID& id);
@@ -81,13 +81,14 @@ Result<bool> impl_deserialize(const std::vector<uint8_t>& data);
 // * Interface for frame validation
 Result<bool> impl_validateFrame() const;
 // * Validate specific sections during set operations
-Result<bool> impl_validateData(const payload& data) const;
-Result<bool> impl_validateDataIndex(const size_t index) const;
-Result<bool> impl_validateID(const frmID& id) const;
+Result<bool> impl_validateHeader() const;
+Result<bool> impl_validateHeader(const std::vector<uint8_t>& packet) const;
 Result<bool> impl_validateType(const Type& type) const;
 Result<bool> impl_validateFrameType(const FrameType& frame_type) const;
 Result<bool> impl_validateFrameFmt(const FrameFmt& frame_fmt) const;
-Result<bool> impl_validateDLC(const uint8_t& dlc) const;
+Result<bool> impl_validateID(const frmID& id) const;
+Result<bool> impl_validateData(const payload& data) const;
+Result<bool> impl_validateDataIndex(size_t index) const;
 // * Additional Checksum validation
 Result<bool> validateChecksum() const {
 	if (checksum_ == calculateChecksum()) {
