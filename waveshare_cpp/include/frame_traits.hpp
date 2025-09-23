@@ -66,9 +66,9 @@
 namespace USBCANBridge {
 
 // Forward declarations
-class FixedFrame;
-class VariableFrame;
-class ConfigFrame;
+	class FixedFrame;
+	class VariableFrame;
+	class ConfigFrame;
 
 /**
  * @brief Primary template for frame traits.
@@ -88,41 +88,41 @@ class ConfigFrame;
  *       directly without specialization. All concrete frame types must provide
  *       explicit specializations with the required interface.
  */
-template <typename Derived> struct FrameTraits {
-  // Interface documentation - these members must be provided by specializations
+	template<typename Derived> struct FrameTraits {
+		// Interface documentation - these members must be provided by specializations
 
-  /// Total frame size in bytes (or MAX_FRAME_SIZE for variable frames)
-  /// Must be: static constexpr std::size_t FRAME_SIZE = N;
-  static constexpr std::size_t FRAME_SIZE = 0;
+		/// Total frame size in bytes (or MAX_FRAME_SIZE for variable frames)
+		/// Must be: static constexpr std::size_t FRAME_SIZE = N;
+		static constexpr std::size_t FRAME_SIZE = 0;
 
-  /// CAN ID field size in bytes (or MAX_ID_SIZE for variable frames)
-  /// Must be: static constexpr std::size_t ID_SIZE = N;
-  static constexpr std::size_t ID_SIZE = 0;
+		/// CAN ID field size in bytes (or MAX_ID_SIZE for variable frames)
+		/// Must be: static constexpr std::size_t ID_SIZE = N;
+		static constexpr std::size_t ID_SIZE = 0;
 
-  /// Data payload size in bytes (or MAX_DATA_SIZE for variable frames)
-  /// Must be: static constexpr std::size_t DATA_SIZE = N;
-  static constexpr std::size_t DATA_SIZE = 0;
+		/// Data payload size in bytes (or MAX_DATA_SIZE for variable frames)
+		/// Must be: static constexpr std::size_t DATA_SIZE = N;
+		static constexpr std::size_t DATA_SIZE = 0;
 
-  /// Storage type for the entire frame (std::array for fixed, std::vector for
-  /// variable) Must be: using StorageType = /* appropriate container type */;
-  using StorageType = void;
+		/// Storage type for the entire frame (std::array for fixed, std::vector for
+		/// variable) Must be: using StorageType = /* appropriate container type */;
+		using StorageType = void;
 
-  /// Type for CAN ID storage
-  /// Must be: using IDType = /* appropriate ID type */;
-  using IDType = void;
+		/// Type for CAN ID storage
+		/// Must be: using IDType = /* appropriate ID type */;
+		using IDType = void;
 
-  /// Type for data payload storage
-  /// Must be: using DataType = /* appropriate data type */;
-  using DataType = void;
+		/// Type for data payload storage
+		/// Must be: using DataType = /* appropriate data type */;
+		using DataType = void;
 
-  /// Pair type for data payload with DLC (Data Length Code)
-  /// Must be: using PayloadPair = std::pair<DataType, std::uint8_t>;
-  using PayloadPair = void;
+		/// Pair type for data payload with DLC (Data Length Code)
+		/// Must be: using PayloadPair = std::pair<DataType, std::byte>;
+		using PayloadPair = void;
 
-  /// Pair type for CAN ID with metadata
-  /// Must be: using IDPair = std::pair<IDType, std::uint8_t>;
-  using IDPair = void;
-};
+		/// Pair type for CAN ID with metadata
+		/// Must be: using IDPair = std::pair<IDType, std::byte>;
+		using IDPair = void;
+	};
 
 /**
  * @brief Frame traits specialization for FixedFrame.
@@ -131,42 +131,42 @@ template <typename Derived> struct FrameTraits {
  * 4-byte CAN ID, and 8-byte data payload. Uses std::array for
  * compile-time size guarantees and efficient stack allocation.
  */
-template <> struct FrameTraits<FixedFrame> {
-  /// Total frame size in bytes (including header, ID, data, checksum)
-  static constexpr std::size_t FRAME_SIZE = 20;
+	template<> struct FrameTraits<FixedFrame> {
+		/// Total frame size in bytes (including header, ID, data, checksum)
+		static constexpr std::size_t FRAME_SIZE = 20;
 
-  /// CAN ID field size in bytes
-  static constexpr std::size_t ID_SIZE = 4;
+		/// CAN ID field size in bytes
+		static constexpr std::size_t ID_SIZE = 4;
 
-  /// Data payload size in bytes
-  static constexpr std::size_t DATA_SIZE = 8;
+		/// Data payload size in bytes
+		static constexpr std::size_t DATA_SIZE = 8;
 
-  /// Storage type for the entire frame (fixed-size array)
-  using StorageType = std::array<std::uint8_t, FRAME_SIZE>;
+		/// Storage type for the entire frame (fixed-size array)
+		using StorageType = std::array<std::byte, FRAME_SIZE>;
 
-  /// Type for CAN ID storage (4-byte array)
-  using IDType = std::array<std::uint8_t, ID_SIZE>;
+		/// Type for CAN ID storage (4-byte array)
+		using IDType = std::array<std::byte, ID_SIZE>;
 
-  /// Type for data payload storage (8-byte array)
-  using DataType = std::array<std::uint8_t, DATA_SIZE>;
+		/// Type for data payload storage (8-byte array)
+		using DataType = std::array<std::byte, DATA_SIZE>;
 
-  /// Pair type for data payload with DLC (Data Length Code)
-  using PayloadPair = std::pair<DataType, std::uint8_t>;
+		/// Pair type for data payload with DLC (Data Length Code)
+		using PayloadPair = std::pair<DataType, std::byte>;
 
-  /// Pair type for CAN ID with length information
-  using IDPair = std::pair<IDType, std::uint8_t>;
+		/// Pair type for CAN ID with length information
+		using IDPair = std::pair<IDType, std::byte>;
 
-private:
-  // Compile-time interface validation
-  static_assert(FRAME_SIZE > 0, "FRAME_SIZE must be positive");
-  static_assert(ID_SIZE > 0, "ID_SIZE must be positive");
-  static_assert(DATA_SIZE > 0, "DATA_SIZE must be positive");
-  static_assert(!std::is_void_v<StorageType>, "StorageType must be defined");
-  static_assert(!std::is_void_v<IDType>, "IDType must be defined");
-  static_assert(!std::is_void_v<DataType>, "DataType must be defined");
-  static_assert(!std::is_void_v<PayloadPair>, "PayloadPair must be defined");
-  static_assert(!std::is_void_v<IDPair>, "IDPair must be defined");
-};
+		private:
+			// Compile-time interface validation
+			static_assert(FRAME_SIZE > 0, "FRAME_SIZE must be positive");
+			static_assert(ID_SIZE > 0, "ID_SIZE must be positive");
+			static_assert(DATA_SIZE > 0, "DATA_SIZE must be positive");
+			static_assert(!std::is_void_v<StorageType>, "StorageType must be defined");
+			static_assert(!std::is_void_v<IDType>, "IDType must be defined");
+			static_assert(!std::is_void_v<DataType>, "DataType must be defined");
+			static_assert(!std::is_void_v<PayloadPair>, "PayloadPair must be defined");
+			static_assert(!std::is_void_v<IDPair>, "IDPair must be defined");
+	};
 
 /**
  * @brief Frame traits specialization for VariableFrame.
@@ -176,42 +176,42 @@ private:
  * and variable data payload up to 8 bytes. Uses std::vector for
  * dynamic sizing and std::variant for flexible ID types.
  */
-template <> struct FrameTraits<VariableFrame> {
-  /// Maximum frame size in bytes
-  static constexpr std::size_t MAX_FRAME_SIZE = 15;
+	template<> struct FrameTraits<VariableFrame> {
+		/// Maximum frame size in bytes
+		static constexpr std::size_t MAX_FRAME_SIZE = 15;
 
-  /// Maximum CAN ID field size in bytes (for extended ID)
-  static constexpr std::size_t MAX_ID_SIZE = 4;
+		/// Maximum CAN ID field size in bytes (for extended ID)
+		static constexpr std::size_t MAX_ID_SIZE = 4;
 
-  /// Maximum data payload size in bytes
-  static constexpr std::size_t MAX_DATA_SIZE = 8;
+		/// Maximum data payload size in bytes
+		static constexpr std::size_t MAX_DATA_SIZE = 8;
 
-  /// Storage type for the entire frame (dynamic vector)
-  using StorageType = std::vector<std::uint8_t>;
+		/// Storage type for the entire frame (dynamic vector)
+		using StorageType = std::vector<std::byte>;
 
-  /// Type for CAN ID storage (variant for standard/extended ID)
-  using IDType = std::variant<std::uint16_t, std::uint32_t>;
+		/// Type for CAN ID storage (variant for standard/extended ID)
+		using IDType = std::variant<std::uint16_t, std::uint32_t>;
 
-  /// Type for data payload storage (dynamic vector)
-  using DataType = std::vector<std::uint8_t>;
+		/// Type for data payload storage (dynamic vector)
+		using DataType = std::vector<std::byte>;
 
-  /// Pair type for data payload with DLC (Data Length Code)
-  using PayloadPair = std::pair<DataType, std::uint8_t>;
+		/// Pair type for data payload with DLC (Data Length Code)
+		using PayloadPair = std::pair<DataType, std::byte>;
 
-  /// Pair type for CAN ID with extended flag
-  using IDPair = std::pair<IDType, std::uint8_t>;
+		/// Pair type for CAN ID with extended flag
+		using IDPair = std::pair<IDType, std::byte>;
 
-private:
-  // Compile-time interface validation
-  static_assert(MAX_FRAME_SIZE > 0, "MAX_FRAME_SIZE must be positive");
-  static_assert(MAX_ID_SIZE > 0, "MAX_ID_SIZE must be positive");
-  static_assert(MAX_DATA_SIZE > 0, "MAX_DATA_SIZE must be positive");
-  static_assert(!std::is_void_v<StorageType>, "StorageType must be defined");
-  static_assert(!std::is_void_v<IDType>, "IDType must be defined");
-  static_assert(!std::is_void_v<DataType>, "DataType must be defined");
-  static_assert(!std::is_void_v<PayloadPair>, "PayloadPair must be defined");
-  static_assert(!std::is_void_v<IDPair>, "IDPair must be defined");
-};
+		private:
+			// Compile-time interface validation
+			static_assert(MAX_FRAME_SIZE > 0, "MAX_FRAME_SIZE must be positive");
+			static_assert(MAX_ID_SIZE > 0, "MAX_ID_SIZE must be positive");
+			static_assert(MAX_DATA_SIZE > 0, "MAX_DATA_SIZE must be positive");
+			static_assert(!std::is_void_v<StorageType>, "StorageType must be defined");
+			static_assert(!std::is_void_v<IDType>, "IDType must be defined");
+			static_assert(!std::is_void_v<DataType>, "DataType must be defined");
+			static_assert(!std::is_void_v<PayloadPair>, "PayloadPair must be defined");
+			static_assert(!std::is_void_v<IDPair>, "IDPair must be defined");
+	};
 
 /**
  * @brief Frame traits specialization for ConfigFrame.
@@ -220,44 +220,44 @@ private:
  * and 16-byte configuration payload. Used for setting baud rates,
  * filters, modes, and other adapter parameters.
  */
-template <> struct FrameTraits<ConfigFrame> {
-  /// Total frame size in bytes
-  static constexpr std::size_t FRAME_SIZE = 20;
+	template<> struct FrameTraits<ConfigFrame> {
+		/// Total frame size in bytes
+		static constexpr std::size_t FRAME_SIZE = 20;
 
-  /// Configuration data size in bytes
-  static constexpr std::size_t CONFIG_SIZE = 16;
+		/// Configuration data size in bytes
+		static constexpr std::size_t CONFIG_SIZE = 16;
 
-  // Alias for interface compatibility (ConfigFrame doesn't use ID/DATA pattern)
-  static constexpr std::size_t ID_SIZE = 0; // Not applicable for config frames
-  static constexpr std::size_t DATA_SIZE = CONFIG_SIZE; // Config data size
+		// Alias for interface compatibility (ConfigFrame doesn't use ID/DATA pattern)
+		static constexpr std::size_t ID_SIZE = 0;				// Not applicable for config frames
+		static constexpr std::size_t DATA_SIZE = CONFIG_SIZE;			// Config data size
 
-  /// Storage type for the entire frame (fixed-size array)
-  using StorageType = std::array<std::uint8_t, FRAME_SIZE>;
+		/// Storage type for the entire frame (fixed-size array)
+		using StorageType = std::array<std::byte, FRAME_SIZE>;
 
-  /// Type for configuration data storage
-  using ConfigType = std::array<std::uint8_t, CONFIG_SIZE>;
+		/// Type for configuration data storage
+		using ConfigType = std::array<std::byte, CONFIG_SIZE>;
 
-  /// Type for baud rate configuration
-  using BaudType = std::uint8_t;
+		/// Type for baud rate configuration
+		using BaudType = std::byte;
 
-  /// Type for CAN mode configuration
-  using ModeType = std::uint8_t;
+		/// Type for CAN mode configuration
+		using ModeType = std::byte;
 
-  // Interface compatibility types (ConfigFrame has different semantics)
-  using IDType = void;         // Not applicable for config frames
-  using DataType = ConfigType; // Configuration data
-  using PayloadPair = std::pair<ConfigType, std::uint8_t>;
-  using IDPair = void; // Not applicable for config frames
+		// Interface compatibility types (ConfigFrame has different semantics)
+		using IDType = void;			// Not applicable for config frames
+		using DataType = ConfigType;		// Configuration data
+		using PayloadPair = std::pair<ConfigType, std::byte>;
+		using IDPair = void;		// Not applicable for config frames
 
-private:
-  // Compile-time interface validation
-  static_assert(FRAME_SIZE > 0, "FRAME_SIZE must be positive");
-  static_assert(CONFIG_SIZE > 0, "CONFIG_SIZE must be positive");
-  static_assert(!std::is_void_v<StorageType>, "StorageType must be defined");
-  static_assert(!std::is_void_v<ConfigType>, "ConfigType must be defined");
-  static_assert(!std::is_void_v<BaudType>, "BaudType must be defined");
-  static_assert(!std::is_void_v<ModeType>, "ModeType must be defined");
-};
+		private:
+			// Compile-time interface validation
+			static_assert(FRAME_SIZE > 0, "FRAME_SIZE must be positive");
+			static_assert(CONFIG_SIZE > 0, "CONFIG_SIZE must be positive");
+			static_assert(!std::is_void_v<StorageType>, "StorageType must be defined");
+			static_assert(!std::is_void_v<ConfigType>, "ConfigType must be defined");
+			static_assert(!std::is_void_v<BaudType>, "BaudType must be defined");
+			static_assert(!std::is_void_v<ModeType>, "ModeType must be defined");
+	};
 
 /**
  * @brief Helper alias template for accessing frame traits.
@@ -274,7 +274,7 @@ private:
  * constexpr auto size = Traits::FRAME_SIZE;
  * @endcode
  */
-template <typename T> using frame_traits_t = FrameTraits<T>;
+	template<typename T> using frame_traits_t = FrameTraits<T>;
 
 /**
  * @brief Compile-time constant for frame size lookup.
@@ -291,14 +291,15 @@ template <typename T> using frame_traits_t = FrameTraits<T>;
  * static_assert(frame_size_v<VariableFrame> == 15);  // Max size
  * @endcode
  */
-template <typename T>
-inline constexpr std::size_t frame_size_v = []() {
-  if constexpr (std::is_same_v<T, VariableFrame>) {
-    return FrameTraits<T>::MAX_FRAME_SIZE;
-  } else {
-    return FrameTraits<T>::FRAME_SIZE;
-  }
-}();
+	template<typename T>
+	inline constexpr std::size_t frame_size_v = []() {
+													if constexpr (std::is_same_v<T,
+																				 VariableFrame> ) {
+														return FrameTraits<T>::MAX_FRAME_SIZE;
+													} else {
+														return FrameTraits<T>::FRAME_SIZE;
+													}
+												}();
 
 /**
  * @brief Type trait to check if a type is a valid frame type.
@@ -309,8 +310,8 @@ inline constexpr std::size_t frame_size_v = []() {
  *
  * @tparam T Type to check
  */
-template <typename T, typename = void>
-struct is_frame_type : std::false_type {};
+	template<typename T, typename = void>
+	struct is_frame_type : std::false_type {};
 
 /**
  * @brief Specialization for valid frame types.
@@ -319,12 +320,12 @@ struct is_frame_type : std::false_type {};
  * specialization with all required interface members and the
  * StorageType is not void (indicating proper specialization).
  */
-template <typename T>
-struct is_frame_type<T, std::void_t<typename FrameTraits<T>::StorageType,
-                                    typename FrameTraits<T>::DataType,
-                                    typename FrameTraits<T>::PayloadPair>>
-    : std::bool_constant<
-          !std::is_void_v<typename FrameTraits<T>::StorageType>> {};
+	template<typename T>
+	struct is_frame_type<T, std::void_t<typename FrameTraits<T>::StorageType,
+										typename FrameTraits<T>::DataType,
+										typename FrameTraits<T>::PayloadPair> >
+		: std::bool_constant<
+			!std::is_void_v<typename FrameTraits<T>::StorageType> > {};
 
 /**
  * @brief Helper variable template for frame type checking.
@@ -337,8 +338,8 @@ struct is_frame_type<T, std::void_t<typename FrameTraits<T>::StorageType,
  * static_assert(!is_frame_type_v<int>);
  * @endcode
  */
-template <typename T>
-inline constexpr bool is_frame_type_v = is_frame_type<T>::value;
+	template<typename T>
+	inline constexpr bool is_frame_type_v = is_frame_type<T>::value;
 
 /**
  * @brief Concept-like validation for frame traits interface.
@@ -348,37 +349,37 @@ inline constexpr bool is_frame_type_v = is_frame_type<T>::value;
  *
  * @tparam T Frame type to validate
  */
-template <typename T> struct validate_frame_traits {
-  using Traits = FrameTraits<T>;
+	template<typename T> struct validate_frame_traits {
+		using Traits = FrameTraits<T>;
 
-  // Validate required types are defined and not void
-  static_assert(!std::is_void_v<typename Traits::StorageType>,
-                "StorageType must be defined (not void)");
-  static_assert(!std::is_void_v<typename Traits::DataType>,
-                "DataType must be defined (not void)");
-  static_assert(!std::is_void_v<typename Traits::PayloadPair>,
-                "PayloadPair must be defined (not void)");
+		// Validate required types are defined and not void
+		static_assert(!std::is_void_v<typename Traits::StorageType>,
+					  "StorageType must be defined (not void)");
+		static_assert(!std::is_void_v<typename Traits::DataType>,
+					  "DataType must be defined (not void)");
+		static_assert(!std::is_void_v<typename Traits::PayloadPair>,
+					  "PayloadPair must be defined (not void)");
 
-  // Validate PayloadPair structure
-  static_assert(
-      std::is_same_v<typename Traits::PayloadPair,
-                     std::pair<typename Traits::DataType, std::uint8_t>>,
-      "PayloadPair must be std::pair<DataType, uint8_t>");
+		// Validate PayloadPair structure
+		static_assert(
+			std::is_same_v<typename Traits::PayloadPair,
+						   std::pair<typename Traits::DataType, std::byte> >,
+			"PayloadPair must be std::pair<DataType, byte>");
 
-  // Frame-specific size validation
-  static_assert(
-      []() {
-        if constexpr (std::is_same_v<T, VariableFrame>) {
-          return Traits::MAX_FRAME_SIZE > 5 && Traits::MAX_FRAME_SIZE <= 15;
-        } else {
-          return Traits::FRAME_SIZE == 20;
-        }
-      }(),
-      "Frame size must be positive and 20 for fixed frames, from 5 to 15 for "
-      "variable frames");
+		// Frame-specific size validation
+		static_assert(
+			[]() {
+			if constexpr (std::is_same_v<T, VariableFrame> ) {
+				return Traits::MAX_FRAME_SIZE > 5 && Traits::MAX_FRAME_SIZE <= 15;
+			} else {
+				return Traits::FRAME_SIZE == 20;
+			}
+		}(),
+			"Frame size must be positive and 20 for fixed frames, from 5 to 15 for "
+			"variable frames");
 
-  static constexpr bool value = true;
-};
+		static constexpr bool value = true;
+	};
 
 /**
  * @brief Helper variable template for frame traits validation.
@@ -390,7 +391,7 @@ template <typename T> struct validate_frame_traits {
  * static_assert(is_valid_frame_traits_v<FixedFrame>);
  * @endcode
  */
-template <typename T>
-inline constexpr bool is_valid_frame_traits_v = validate_frame_traits<T>::value;
+	template<typename T>
+	inline constexpr bool is_valid_frame_traits_v = validate_frame_traits<T>::value;
 
-} // namespace USBCANBridge
+}		// namespace USBCANBridge
