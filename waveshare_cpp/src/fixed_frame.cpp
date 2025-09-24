@@ -9,7 +9,8 @@ namespace USBCANBridge {
      * properly initialized.
      */
     void FixedFrame::init_fixed_fields() {
-        // ? [START] is already set by BaseFrame constructor
+        // * [START]
+        storage_[to_size_t(FixedSizeIndex::START)] = to_byte(Constants::START_BYTE);
         // * [HEADER]
         storage_[to_size_t(FixedSizeIndex::HEADER)] = to_byte(Constants::MSG_HEADER);
         // * [TYPE]
@@ -40,7 +41,7 @@ namespace USBCANBridge {
      * Resets all fields to zero and reinitializes fixed fields.
      * Marks the checksum as dirty for recalculation.
      *
-     * @return Result<void>
+     * @return Result<Status>
      */
     Result<Status> FixedFrame::impl_clear() {
         // Reset to default state

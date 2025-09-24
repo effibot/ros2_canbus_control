@@ -110,7 +110,7 @@ namespace USBCANBridge {
 
             /**
              * @brief Prepares the frame for wire protocol serialization.
-             *
+             * The implementation in the derived class must ensure that the frame is valid and return a copy of the internal storage.
              * @return Result<StorageType>
              */
             Result<StorageType> serialize() const {
@@ -118,7 +118,7 @@ namespace USBCANBridge {
             }
             /**
              * @brief Reconstructs the frame from raw wire protocol data.
-             *
+             * The implementation in the derived class must validate the input data and populate the internal storage.
              * @param data
              * @return Result<Status>
              */

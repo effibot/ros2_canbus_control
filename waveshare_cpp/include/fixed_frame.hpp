@@ -1,6 +1,7 @@
 #pragma once
 
 #include "base_frame.hpp"
+#include "checksum_utils.hpp"
 #include <numeric>
 
 namespace USBCANBridge {
@@ -17,7 +18,7 @@ namespace USBCANBridge {
         protected:
             using PayloadPair = typename Traits::PayloadPair;
             using IDPair = typename Traits::IDPair;
-            alignas(4) StorageType storage_ = {std::byte{0}};
+            alignas(4) mutable StorageType storage_ = {std::byte{0}};
             // dirty bit for lazy evaluation of checksum
             mutable bool dirty_ = true;
             // cached checksum value
@@ -111,21 +112,9 @@ namespace USBCANBridge {
              * @return uint8_t The calculated checksum (low 8 bits of sum)
              */
             static uint8_t calculateChecksum(const std::byte* data, std::size_t size) {
-                // Validate input parameters
-                if (!data || size < 20) {
-                    return 0; // or throw an exception based on your error handling strategy
-                }
-
-                // Calculate checksum over bytes [TYPE..RESERVED] (indices 2-18)
-                constexpr std::size_t start_idx = to_size_t(FixedSizeIndex::TYPE);
-                constexpr std::size_t end_idx = to_size_t(FixedSizeIndex::RESERVED);
-
-                uint8_t sum = 0;
-                for (std::size_t i = start_idx; i <= end_idx; ++i) {
-                    sum += static_cast<uint8_t>(data[i]);
-                }
-
-                return sum;
+                return ChksmUtil::calculateChecksum(data, size,
+                    to_size_t(FixedSizeIndex::TYPE),
+                    to_size_t(FixedSizeIndex::RESERVED));
             }
 
             /**
@@ -140,46 +129,35 @@ namespace USBCANBridge {
              * @return bool True if checksum is valid, false otherwise
              */
             static Result<Status> validateChecksum(const std::byte* data, std::size_t size) {
-                // Validate input parameters
-                if (!data || size < 20) {
-                    return Result<Status>::error(Status::WBAD_LENGTH);
-                }
-
-                // Calculate expected checksum
-                uint8_t calculated = calculateChecksum(data, size);
-
-                // Get stored checksum from frame
-                uint8_t stored = static_cast<uint8_t>(data[to_size_t(FixedSizeIndex::CHECKSUM)]);
-                if (calculated != stored) {
-                    return Result<Status>::error(Status::WBAD_CHECKSUM);
-                }
-                return Result<Status>::success(Status::SUCCESS);
+                return ChksmUtil::validateChecksum(data, size,
+                    to_size_t(FixedSizeIndex::TYPE),
+                    to_size_t(FixedSizeIndex::RESERVED),
+                    to_size_t(FixedSizeIndex::CHECKSUM));
             }
 
             /**
              * @brief Calculate the checksum for a fixed frame over the bytes:
              * type, frame_type, frame_fmt, id[4], dlc, data[8], reserved.
              * The checksum is the low 8 bits of the sum of these bytes
-             * @param frame The fixed frame to calculate the checksum for.
              * @return uint8_t The calculated checksum.
              */
             Result<uint8_t> calculateChecksum() const {
+                return Result<uint8_t>::success(
+                    ChksmUtil::calculateChecksum<FixedFrame>(storage_)
+                );
+            }
+            /**
+             * @brief Update and cache the checksum for the current fixed frame.
+             * If the frame has been modified (dirty_), recalculates the checksum.
+             * @return Result<uint8_t> The updated checksum.
+             */
+            Result<uint8_t> updateChecksum() const {
                 // Check if cached checksum is valid
                 if (dirty_) {
-                    // Perform fast checksum calculation using std::transform_reduce
-                    uint8_t sum = std::transform_reduce(
-                        storage_.begin() + to_size_t(FixedSizeIndex::TYPE),
-                        storage_.begin() + to_size_t(FixedSizeIndex::RESERVED) + 1,
-                        uint8_t{0},        // initial value
-                        std::plus<uint8_t>{}, // reduction operation
-                        [](std::byte b) {
-                            return static_cast<uint8_t>(b);
-                        } // transform operation
-                    );
-
-                    // Cache the result
-                    checksum_ = sum;
+                    // Use polymorphic checksum utility
+                    checksum_ = ChksmUtil::calculateChecksum<FixedFrame>(storage_);
                     dirty_ = false;
+                    storage_[to_size_t(FixedSizeIndex::CHECKSUM)] = to_byte(checksum_);
                 }
                 return Result<uint8_t>::success(checksum_);
             }
@@ -190,15 +168,8 @@ namespace USBCANBridge {
              * @return Result<Status> The result of the validation.
              */
             Result<Status> validateChecksum(const FixedFrame& frame) const {
-                // * Calculate checksum and compare to stored value
-                auto calc_checksum = frame.calculateChecksum();
-                if (calc_checksum.fail()) {
-                    return Result<Status>::error(Status::UNKNOWN);
-                }
-                if (calc_checksum.value != frame.checksum_) {
-                    return Result<Status>::error(Status::WBAD_CHECKSUM);
-                }
-                return Result<Status>::success(Status::SUCCESS);
+                // Use polymorphic checksum utility
+                return ChksmUtil::validateChecksum<FixedFrame>(frame.storage_);
             }
     };
 }
