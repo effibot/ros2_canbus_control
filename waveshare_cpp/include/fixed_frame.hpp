@@ -85,25 +85,103 @@ namespace USBCANBridge {
             // * Validation methods
             Result<Status> impl_validate() const;
 
+            // ? Individual field validation methods
+            Result<Status> validate_start_byte() const;
+            Result<Status> validate_header_byte() const;
+            Result<Status> validate_type(const Type& type) const;
+            Result<Status> validate_frame_type(const FrameType& frame_type) const;
+            Result<Status> validate_frame_fmt(const FrameFmt& frame_fmt) const;
+            Result<Status> validate_id_size(const IDPair& id) const;
+            Result<Status> validate_dlc(const std::byte& dlc) const;
+            Result<Status> validate_dlc(const std::size_t& dlc) const;
+            Result<Status> validate_reserved_byte() const;
+
             // ? Checksum specific methods
+
+            // Static methods for raw byte stream processing
+            /**
+             * @brief Calculate checksum from raw byte stream (static version).
+             *
+             * This static method calculates the checksum for a fixed frame from raw bytes
+             * without requiring a FixedFrame object allocation. It operates on the checksum
+             * range: TYPE to RESERVED inclusive (bytes 2-18 of a 20-byte frame).
+             *
+             * @param data Pointer to the raw byte data (must be at least 20 bytes)
+             * @param size Size of the data buffer (must be at least 20 bytes)
+             * @return uint8_t The calculated checksum (low 8 bits of sum)
+             */
+            static uint8_t calculateChecksum(const std::byte* data, std::size_t size) {
+                // Validate input parameters
+                if (!data || size < 20) {
+                    return 0; // or throw an exception based on your error handling strategy
+                }
+
+                // Calculate checksum over bytes [TYPE..RESERVED] (indices 2-18)
+                constexpr std::size_t start_idx = to_size_t(FixedSizeIndex::TYPE);
+                constexpr std::size_t end_idx = to_size_t(FixedSizeIndex::RESERVED);
+
+                uint8_t sum = 0;
+                for (std::size_t i = start_idx; i <= end_idx; ++i) {
+                    sum += static_cast<uint8_t>(data[i]);
+                }
+
+                return sum;
+            }
+
+            /**
+             * @brief Validate checksum from raw byte stream (static version).
+             *
+             * This static method validates the checksum of a fixed frame from raw bytes
+             * without requiring a FixedFrame object allocation. It calculates the expected
+             * checksum and compares it with the stored checksum at position 19.
+             *
+             * @param data Pointer to the raw byte data (must be at least 20 bytes)
+             * @param size Size of the data buffer (must be at least 20 bytes)
+             * @return bool True if checksum is valid, false otherwise
+             */
+            static Result<Status> validateChecksum(const std::byte* data, std::size_t size) {
+                // Validate input parameters
+                if (!data || size < 20) {
+                    return Result<Status>::error(Status::WBAD_LENGTH);
+                }
+
+                // Calculate expected checksum
+                uint8_t calculated = calculateChecksum(data, size);
+
+                // Get stored checksum from frame
+                uint8_t stored = static_cast<uint8_t>(data[to_size_t(FixedSizeIndex::CHECKSUM)]);
+                if (calculated != stored) {
+                    return Result<Status>::error(Status::WBAD_CHECKSUM);
+                }
+                return Result<Status>::success(Status::SUCCESS);
+            }
+
             /**
              * @brief Calculate the checksum for a fixed frame over the bytes:
              * type, frame_type, frame_fmt, id[4], dlc, data[8], reserved.
              * The checksum is the low 8 bits of the sum of these bytes
              * @param frame The fixed frame to calculate the checksum for.
-             * @return constexpr uint8_t The calculated checksum.
+             * @return uint8_t The calculated checksum.
              */
-            constexpr uint8_t calculateChecksum(const FixedFrame& frame) const {
-                // * Perform fast checksum calculation using std::accumulate and pointer arithmetic
-                uint32_t sum = std::accumulate(frame.storage_.begin() +
-                    to_size_t(FixedSizeIndex::TYPE),
-                    frame.storage_.begin() +
-                    to_size_t(FixedSizeIndex::RESERVED) + 1,
-                    0);
-                // unset the dirty bit
-                dirty_ = false;
-                // Mask to low 8 bits
-                return static_cast<uint8_t>(sum & 0xFF);
+            Result<uint8_t> calculateChecksum() const {
+                // Check if cached checksum is valid
+                if (dirty_) {
+                    // Perform fast checksum calculation using std::transform_reduce
+                    uint8_t sum = std::transform_reduce(
+                        storage_.begin() + to_size_t(FixedSizeIndex::TYPE),
+                        storage_.begin() + to_size_t(FixedSizeIndex::RESERVED) + 1,
+                        uint8_t{0},        // initial value
+                        std::plus<uint8_t>{}, // reduction operation
+                        [](std::byte b) {
+                            return static_cast<uint8_t>(b);
+                        } // transform operation
+                    );
+
+                    // Cache the result
+                    checksum_ = sum;
+                    dirty_ = false;
+                }
+                return Result<uint8_t>::success(checksum_);
             }
             /**
              * @brief Validate the checksum of the given fixed frame.
@@ -113,13 +191,14 @@ namespace USBCANBridge {
              */
             Result<Status> validateChecksum(const FixedFrame& frame) const {
                 // * Calculate checksum and compare to stored value
-                uint8_t calc_checksum = calculateChecksum(frame);
-                if (calc_checksum != frame.checksum_) {
+                auto calc_checksum = frame.calculateChecksum();
+                if (calc_checksum.fail()) {
+                    return Result<Status>::error(Status::UNKNOWN);
+                }
+                if (calc_checksum.value != frame.checksum_) {
                     return Result<Status>::error(Status::WBAD_CHECKSUM);
                 }
                 return Result<Status>::success(Status::SUCCESS);
             }
-
-
     };
 }

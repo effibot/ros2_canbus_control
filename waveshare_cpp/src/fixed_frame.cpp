@@ -44,7 +44,7 @@ namespace USBCANBridge {
      */
     Result<Status> FixedFrame::impl_clear() {
         // Reset to default state
-        std::fill(storage_.begin(), storage_.end(), 0);
+        std::fill(storage_.begin(), storage_.end(), std::byte{0});
         // Reinitialize fixed fields
         init_fixed_fields();
         // Mark checksum as dirty
@@ -75,8 +75,9 @@ namespace USBCANBridge {
      */
     Result<Status> FixedFrame::impl_set_type(const Type& type) {
         // Validate type for fixed frame
-        if (type != Type::DATA_FIXED) {
-            return Result<Status>::error(Status::WBAD_TYPE);
+        auto validation_result = validate_type(type);
+        if (validation_result.fail()) {
+            return validation_result;
         }
         storage_[to_size_t(FixedSizeIndex::TYPE)] = to_byte(type);
         // Mark checksum as dirty
@@ -104,8 +105,9 @@ namespace USBCANBridge {
      */
     Result<Status> FixedFrame::impl_set_frame_type(const FrameType& frame_type) {
         // Validate frame type for fixed frame
-        if (frame_type != FrameType::STD_FIXED && frame_type != FrameType::EXT_FIXED) {
-            return Result<Status>::error(Status::WBAD_TYPE);
+        auto validation_result = validate_frame_type(frame_type);
+        if (validation_result.fail()) {
+            return validation_result;
         }
         storage_[to_size_t(FixedSizeIndex::FRAME_TYPE)] = to_byte(frame_type);
         // Mark checksum as dirty
@@ -137,8 +139,9 @@ namespace USBCANBridge {
      */
     Result<Status> FixedFrame::impl_set_frame_fmt(const FrameFmt& frame_fmt) {
         // Validate frame format for fixed frame
-        if (frame_fmt != FrameFmt::DATA_FIXED && frame_fmt != FrameFmt::REMOTE_FIXED) {
-            return Result<Status>::error(Status::WBAD_FORMAT);
+        auto validation_result = validate_frame_fmt(frame_fmt);
+        if (validation_result.fail()) {
+            return validation_result;
         }
         storage_[to_size_t(FixedSizeIndex::FRAME_FMT)] = to_byte(frame_fmt);
         // Mark checksum as dirty
@@ -180,9 +183,9 @@ namespace USBCANBridge {
      */
     Result<Status> FixedFrame::impl_set_id(const IDPair& id) {
         // Validate ID size against current FrameType
-        size_t expected_size = is_extended().value ? 4 : 2;
-        if (id.second != expected_size) {
-            return Result<Status>::error(Status::WBAD_ID);
+        auto validation_result = validate_id_size(id);
+        if (validation_result.fail()) {
+            return validation_result;
         }
         // Copy ID bytes into storage
         std::copy_n(
@@ -212,9 +215,9 @@ namespace USBCANBridge {
      */
     Result<Status> FixedFrame::impl_set_dlc(const std::byte& dlc) {
         // Validate DLC range (0-8)
-        auto dlc_value = static_cast<uint>(dlc);
-        if (dlc_value > 8) {
-            return Result<Status>::error(Status::WBAD_DLC);
+        auto validation_result = validate_dlc(dlc);
+        if (validation_result.fail()) {
+            return validation_result;
         }
         storage_[to_size_t(FixedSizeIndex::DLC)] = dlc;
         // Mark checksum as dirty
@@ -246,8 +249,9 @@ namespace USBCANBridge {
      */
     Result<Status> FixedFrame::impl_set_data(const PayloadPair& new_data) {
         // Validate DLC range
-        if (new_data.second > 8) {
-            return Result<Status>::error(Status::WBAD_DLC);
+        auto validation_result = validate_dlc(new_data.second);
+        if (validation_result.fail()) {
+            return validation_result;
         }
         // Copy new bytes into the frame data field
         auto frame_start = storage_.begin() + to_size_t(FixedSizeIndex::DATA_0);
@@ -255,7 +259,7 @@ namespace USBCANBridge {
         // Zero-fill unused bytes
         std::fill(frame_start + new_data.second, frame_start + 8, std::byte{0});
         // Update DLC
-        storage_[to_size_t(FixedSizeIndex::DLC)] = to_byte(new_data.second);
+        storage_[to_size_t(FixedSizeIndex::DLC)] = static_cast<std::byte>(new_data.second);
         // Mark dirty for checksum recalculation
         dirty_ = true;
         return Result<Status>::success(Status::SUCCESS);
@@ -278,50 +282,175 @@ namespace USBCANBridge {
      */
     Result<Status> FixedFrame::impl_validate() const {
         // Validate start byte
-        if (storage_[to_size_t(FixedSizeIndex::START)] != to_byte(Constants::START_BYTE)) {
-            return Result<Status>::error(Status::WBAD_START);
+        auto start_result = validate_start_byte();
+        if (start_result.fail()) {
+            return start_result;
         }
+
         // Validate header byte
-        if (storage_[to_size_t(FixedSizeIndex::HEADER)] != to_byte(Constants::MSG_HEADER)) {
-            return Result<Status>::error(Status::WBAD_HEADER);
+        auto header_result = validate_header_byte();
+        if (header_result.fail()) {
+            return header_result;
         }
+
         // Validate type
-        if (storage_[to_size_t(FixedSizeIndex::TYPE)] != to_byte(Type::DATA_FIXED)) {
-            return Result<Status>::error(Status::WBAD_TYPE);
+        Type current_type = static_cast<Type>(storage_[to_size_t(FixedSizeIndex::TYPE)]);
+        auto type_result = validate_type(current_type);
+        if (type_result.fail()) {
+            return type_result;
         }
+
         // Validate frame type
         FrameType frame_type =
             static_cast<FrameType>(storage_[to_size_t(FixedSizeIndex::FRAME_TYPE)]);
-        if (frame_type != FrameType::STD_FIXED && frame_type != FrameType::EXT_FIXED) {
-            return Result<Status>::error(Status::WBAD_FRAME_TYPE);
+        auto frame_type_result = validate_frame_type(frame_type);
+        if (frame_type_result.fail()) {
+            return frame_type_result;
         }
+
         // Validate frame format
         FrameFmt frame_fmt = static_cast<FrameFmt>(storage_[to_size_t(FixedSizeIndex::FRAME_FMT)]);
-        if (frame_fmt != FrameFmt::DATA_FIXED && frame_fmt != FrameFmt::REMOTE_FIXED) {
-            return Result<Status>::error(Status::WBAD_FORMAT);
+        auto frame_fmt_result = validate_frame_fmt(frame_fmt);
+        if (frame_fmt_result.fail()) {
+            return frame_fmt_result;
         }
+
         // Validate DLC
-        uint8_t dlc = static_cast<uint8_t>(storage_[to_size_t(FixedSizeIndex::DLC)]);
-        if (dlc > 8) {
-            return Result<Status>::error(Status::WBAD_DLC);
+        std::byte dlc_byte = storage_[to_size_t(FixedSizeIndex::DLC)];
+        auto dlc_result = validate_dlc(dlc_byte);
+        if (dlc_result.fail()) {
+            return dlc_result;
         }
+
         // Validate reserved byte
-        if (storage_[to_size_t(FixedSizeIndex::RESERVED)] != to_byte(Constants::RESERVED0)) {
-            return Result<Status>::error(Status::WBAD_RESERVED);
+        auto reserved_result = validate_reserved_byte();
+        if (reserved_result.fail()) {
+            return reserved_result;
         }
+
         // Validate checksum
-        uint8_t computed_checksum = 0;
-        for (size_t i = to_size_t(FixedSizeIndex::HEADER); i < to_size_t(FixedSizeIndex::CHECKSUM);
-            ++i) {
-            computed_checksum += static_cast<uint8_t>(storage_[i]);
-        }
-        if (computed_checksum !=
-            static_cast<uint8_t>(storage_[to_size_t(FixedSizeIndex::CHECKSUM)])) {
-            return Result<Status>::error(Status::WBAD_CHECKSUM);
+        auto checksum_result = validateChecksum(*this);
+        if (checksum_result.fail()) {
+            return checksum_result;
         }
         return Result<Status>::success(Status::SUCCESS);
     }
 
+    // ? Individual field validation methods
+    /**
+     * @brief Validate the start byte of the frame.
+     *
+     * @return Result<Status> SUCCESS if start byte is 0xAA, WBAD_START otherwise
+     */
+    Result<Status> FixedFrame::validate_start_byte() const {
+        if (storage_[to_size_t(FixedSizeIndex::START)] != to_byte(Constants::START_BYTE)) {
+            return Result<Status>::error(Status::WBAD_START);
+        }
+        return Result<Status>::success(Status::SUCCESS);
+    }
 
+    /**
+     * @brief Validate the header byte of the frame.
+     *
+     * @return Result<Status> SUCCESS if header byte is 0x55, WBAD_HEADER otherwise
+     */
+    Result<Status> FixedFrame::validate_header_byte() const {
+        if (storage_[to_size_t(FixedSizeIndex::HEADER)] != to_byte(Constants::MSG_HEADER)) {
+            return Result<Status>::error(Status::WBAD_HEADER);
+        }
+        return Result<Status>::success(Status::SUCCESS);
+    }
+
+    /**
+     * @brief Validate the type field of the frame.
+     *
+     * @param type The type to validate
+     * @return Result<Status> SUCCESS if type is DATA_FIXED, WBAD_TYPE otherwise
+     */
+    Result<Status> FixedFrame::validate_type(const Type& type) const {
+        if (type != Type::DATA_FIXED) {
+            return Result<Status>::error(Status::WBAD_TYPE);
+        }
+        return Result<Status>::success(Status::SUCCESS);
+    }
+
+    /**
+     * @brief Validate the frame type field.
+     *
+     * @param frame_type The frame type to validate
+     * @return Result<Status> SUCCESS if frame_type is STD_FIXED or EXT_FIXED, WBAD_TYPE otherwise
+     */
+    Result<Status> FixedFrame::validate_frame_type(const FrameType& frame_type) const {
+        if (frame_type != FrameType::STD_FIXED && frame_type != FrameType::EXT_FIXED) {
+            return Result<Status>::error(Status::WBAD_TYPE);
+        }
+        return Result<Status>::success(Status::SUCCESS);
+    }
+
+    /**
+     * @brief Validate the frame format field.
+     *
+     * @param frame_fmt The frame format to validate
+     * @return Result<Status> SUCCESS if frame_fmt is DATA_FIXED or REMOTE_FIXED, WBAD_FORMAT otherwise
+     */
+    Result<Status> FixedFrame::validate_frame_fmt(const FrameFmt& frame_fmt) const {
+        if (frame_fmt != FrameFmt::DATA_FIXED && frame_fmt != FrameFmt::REMOTE_FIXED) {
+            return Result<Status>::error(Status::WBAD_FORMAT);
+        }
+        return Result<Status>::success(Status::SUCCESS);
+    }
+
+    /**
+     * @brief Validate the ID size against the current frame type.
+     *
+     * @param id The ID pair to validate (contains both ID bytes and size)
+     * @return Result<Status> SUCCESS if ID size matches frame type requirements, WBAD_ID otherwise
+     */
+    Result<Status> FixedFrame::validate_id_size(const IDPair& id) const {
+        size_t expected_size = is_extended().value ? 4 : 2;
+        if (id.second != expected_size) {
+            return Result<Status>::error(Status::WBAD_ID);
+        }
+        return Result<Status>::success(Status::SUCCESS);
+    }
+
+    /**
+     * @brief Validate the Data Length Code (byte version).
+     *
+     * @param dlc The DLC to validate as std::byte
+     * @return Result<Status> SUCCESS if DLC is in range 0-8, WBAD_DLC otherwise
+     */
+    Result<Status> FixedFrame::validate_dlc(const std::byte& dlc) const {
+        auto dlc_value = static_cast<uint>(dlc);
+        if (dlc_value > 8) {
+            return Result<Status>::error(Status::WBAD_DLC);
+        }
+        return Result<Status>::success(Status::SUCCESS);
+    }
+
+    /**
+     * @brief Validate the Data Length Code (size_t version).
+     *
+     * @param dlc The DLC to validate as std::size_t
+     * @return Result<Status> SUCCESS if DLC is in range 0-8, WBAD_DLC otherwise
+     */
+    Result<Status> FixedFrame::validate_dlc(const std::size_t& dlc) const {
+        if (dlc > 8) {
+            return Result<Status>::error(Status::WBAD_DLC);
+        }
+        return Result<Status>::success(Status::SUCCESS);
+    }
+
+    /**
+     * @brief Validate the reserved byte of the frame.
+     *
+     * @return Result<Status> SUCCESS if reserved byte is 0x00, WBAD_RESERVED otherwise
+     */
+    Result<Status> FixedFrame::validate_reserved_byte() const {
+        if (storage_[to_size_t(FixedSizeIndex::RESERVED)] != to_byte(Constants::RESERVED0)) {
+            return Result<Status>::error(Status::WBAD_RESERVED);
+        }
+        return Result<Status>::success(Status::SUCCESS);
+    }
 
 }
