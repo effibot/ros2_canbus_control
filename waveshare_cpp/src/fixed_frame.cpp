@@ -1,5 +1,4 @@
 #include "fixed_frame.hpp"
-#include <algorithm>
 
 namespace USBCANBridge {
     /**
@@ -61,9 +60,7 @@ namespace USBCANBridge {
      */
     Result<Type> FixedFrame::impl_get_type() const {
         return Result<Type>::success(
-            static_cast<Type>(
-                storage_[to_size_t(FixedSizeIndex::TYPE)]
-            )
+            from_byte<Type>(storage_[to_size_t(FixedSizeIndex::TYPE)])
         );
     }
     /**
@@ -94,7 +91,7 @@ namespace USBCANBridge {
      */
     Result<FrameType> FixedFrame::impl_get_frame_type() const {
         return Result<FrameType>::success(
-            static_cast<FrameType>(storage_[to_size_t(FixedSizeIndex::FRAME_TYPE)])
+            from_byte<FrameType>(storage_[to_size_t(FixedSizeIndex::FRAME_TYPE)])
         );
     }
     /**
@@ -127,7 +124,7 @@ namespace USBCANBridge {
      */
     Result<FrameFmt> FixedFrame::impl_get_frame_fmt() const {
         return Result<FrameFmt>::success(
-            static_cast<FrameFmt>(storage_[to_size_t(FixedSizeIndex::FRAME_FMT)])
+            from_byte<FrameFmt>(storage_[to_size_t(FixedSizeIndex::FRAME_FMT)])
         );
     }
     /**
@@ -151,8 +148,55 @@ namespace USBCANBridge {
     }
 
     // * Wire protocol serialization/deserialization
-    // Result<StorageType> FixedFrame::impl_serialize() const;
-    // Result<Status> FixedFrame::impl_deserialize(const StorageType& data);
+    /**
+     * @brief Serialize the frame into a byte array.
+     * Validates the frame and return a copy of the internal storage with updated checksum.
+     *
+     * @return Result<StorageType>
+     */
+    Result<FixedFrame::StorageType> FixedFrame::impl_serialize() const {
+        // Update checksum if dirty
+        updateChecksum();
+
+        // validate the entire frame before serialization
+        auto validation_res = impl_validate();
+        if (validation_res.fail()) {
+            // initialize an array with error status for interface consistency
+            StorageType error_storage = {to_byte(Status::WBAD_DATA)};
+            Result<StorageType> res = Result<StorageType>();
+            res.value = error_storage;
+            res.status = validation_res.status;
+            return res;
+        }
+
+        // If everything is valid, proceed with serialization
+        StorageType storage_copy = storage_;
+
+        return Result<StorageType>::success(storage_copy);
+    }
+    /**
+     * @brief Deserialize a byte array into the config frame.
+     * The caller must prepare a valid StorageType array of correct size.
+     * @see frame_traits.hpp for details on StorageType<T>
+     *
+     * @param data
+     * @return Result<Status>
+     */
+    Result<Status> FixedFrame::impl_deserialize(const StorageType& data) {
+        // Validate input size
+        if (data.size() != Traits::FRAME_SIZE) {
+            return Result<Status>::error(Status::WBAD_LENGTH);
+        }
+        // Copy data into internal storage
+        storage_ = data;
+        dirty_   = true; // mark checksum as dirty for recalculation
+        // Validate the entire frame after deserialization
+        auto res = impl_validate();
+        if (res.fail()) {
+            return res;
+        }
+        return Result<Status>::success(Status::SUCCESS);
+    }
 
     // ? Fixed Frame specific Interface
     /**
@@ -295,29 +339,28 @@ namespace USBCANBridge {
         }
 
         // Validate type
-        Type current_type = static_cast<Type>(storage_[to_size_t(FixedSizeIndex::TYPE)]);
+        Type current_type = impl_get_type().value;
         auto type_result = validate_type(current_type);
         if (type_result.fail()) {
             return type_result;
         }
 
         // Validate frame type
-        FrameType frame_type =
-            static_cast<FrameType>(storage_[to_size_t(FixedSizeIndex::FRAME_TYPE)]);
+        FrameType frame_type = impl_get_frame_type().value;
         auto frame_type_result = validate_frame_type(frame_type);
         if (frame_type_result.fail()) {
             return frame_type_result;
         }
 
         // Validate frame format
-        FrameFmt frame_fmt = static_cast<FrameFmt>(storage_[to_size_t(FixedSizeIndex::FRAME_FMT)]);
+        FrameFmt frame_fmt = impl_get_frame_fmt().value;
         auto frame_fmt_result = validate_frame_fmt(frame_fmt);
         if (frame_fmt_result.fail()) {
             return frame_fmt_result;
         }
 
         // Validate DLC
-        std::byte dlc_byte = storage_[to_size_t(FixedSizeIndex::DLC)];
+        std::byte dlc_byte = impl_get_dlc().value;
         auto dlc_result = validate_dlc(dlc_byte);
         if (dlc_result.fail()) {
             return dlc_result;

@@ -2,7 +2,7 @@
 
 #include "base_frame.hpp"
 #include "checksum_utils.hpp"
-#include <numeric>
+
 
 namespace USBCANBridge {
     /**
@@ -16,8 +16,8 @@ namespace USBCANBridge {
      */
     class FixedFrame : public BaseFrame<FixedFrame> {
         protected:
-            using PayloadPair = typename Traits::PayloadPair;
-            using IDPair = typename Traits::IDPair;
+            using PayloadPair = Traits::PayloadPair;
+            using IDPair = Traits::IDPair;
             alignas(4) mutable StorageType storage_ = {std::byte{0}};
             // dirty bit for lazy evaluation of checksum
             mutable bool dirty_ = true;
@@ -26,6 +26,10 @@ namespace USBCANBridge {
             // cached id size value
             mutable size_t id_size_ = 0;
         private:
+            /**
+             * @brief Initialize fixed fields of the fixed frame.
+             * @see FixedSizeIndex in common.hpp for field details.
+             */
             void init_fixed_fields();
 
         public:
@@ -151,23 +155,32 @@ namespace USBCANBridge {
              * If the frame has been modified (dirty_), recalculates the checksum.
              * @return Result<uint8_t> The updated checksum.
              */
-            Result<uint8_t> updateChecksum() const {
+            Result<Status> updateChecksum() const {
                 // Check if cached checksum is valid
                 if (dirty_) {
                     // Use polymorphic checksum utility
                     checksum_ = ChksmUtil::calculateChecksum<FixedFrame>(storage_);
                     dirty_ = false;
-                    storage_[to_size_t(FixedSizeIndex::CHECKSUM)] = to_byte(checksum_);
+                    storage_[to_size_t(FixedSizeIndex::CHECKSUM)] =
+                        static_cast<std::byte>(checksum_);
                 }
-                return Result<uint8_t>::success(checksum_);
+                return Result<Status>::success(Status::SUCCESS);
             }
             /**
              * @brief Validate the checksum of the given fixed frame.
              * This validation is intended to be used during deserialization to ensure data integrity. When validating the current object, use impl_validate() instead which also checks other fields.
+             * If the dirty_ flag is set, the checksum is updated before validation.
              * @param frame The fixed frame to validate.
              * @return Result<Status> The result of the validation.
              */
             Result<Status> validateChecksum(const FixedFrame& frame) const {
+                if (dirty_) {
+                    // Update checksum if frame is dirty
+                    auto res = updateChecksum();
+                    if (res.fail()) {
+                        return res;
+                    }
+                }
                 // Use polymorphic checksum utility
                 return ChksmUtil::validateChecksum<FixedFrame>(frame.storage_);
             }

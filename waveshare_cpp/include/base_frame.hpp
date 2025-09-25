@@ -1,17 +1,18 @@
 #pragma once
+#include <numeric>
+#include <algorithm>
 
 #include "common.hpp"
 #include "error.hpp"
 #include "result.hpp"
 #include "frame_traits.hpp"
 
-
 namespace USBCANBridge {
     template<typename Derived>
     class BaseFrame {
         protected:
             // bring traits into scope
-            using Traits = FrameTraits<Derived>;
+            using Traits = frame_traits_t<Derived>;
             using StorageType = typename Traits::StorageType;
         private:
             // Access to the concrete Derived class

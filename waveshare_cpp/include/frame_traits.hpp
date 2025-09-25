@@ -162,7 +162,7 @@ namespace USBCANBridge {
 
         private:
             // Compile-time interface validation
-            static_assert(FRAME_SIZE > 0, "FRAME_SIZE must be positive");
+            static_assert(FRAME_SIZE == 20, "FRAME_SIZE must be 20 bytes");
             static_assert(ID_SIZE > 0, "ID_SIZE must be positive");
             static_assert(DATA_SIZE > 0, "DATA_SIZE must be positive");
             static_assert(!std::is_void_v<StorageType>, "StorageType must be defined");
@@ -232,39 +232,34 @@ namespace USBCANBridge {
         /// Total frame size in bytes
         static constexpr std::size_t FRAME_SIZE = 20;
 
-        /// Configuration data size in bytes
-        static constexpr std::size_t CONFIG_SIZE = 16;
+        /// Bitmap size for configuration data
+        static constexpr std::size_t BITMAP_SIZE = 4;
 
         // Alias for interface compatibility (ConfigFrame doesn't use ID/DATA pattern)
         static constexpr std::size_t ID_SIZE = 0; // Not applicable for config frames
-        static constexpr std::size_t DATA_SIZE = CONFIG_SIZE; // Config data size
+        static constexpr std::size_t DATA_SIZE = 0; // Not applicable for config frames
+
 
         /// Storage type for the entire frame (fixed-size array)
         using StorageType = std::array<std::byte, FRAME_SIZE>;
 
         /// Type for configuration data storage
-        using ConfigType = std::array<std::byte, CONFIG_SIZE>;
-
-        /// Type for baud rate configuration
-        using BaudType = std::byte;
-
-        /// Type for CAN mode configuration
-        using ModeType = std::byte;
+        using FilterType = std::array<std::byte, BITMAP_SIZE>;
+        using MaskType = std::array<std::byte, BITMAP_SIZE>;
 
         // Interface compatibility types (ConfigFrame has different semantics)
         using IDType = void; // Not applicable for config frames
-        using DataType = ConfigType; // Configuration data
-        using PayloadPair = std::pair<ConfigType, std::byte>;
+        using DataType = void; // Not applicable for config frames
+        using PayloadPair = void; // Not applicable for config frames
         using IDPair = void; // Not applicable for config frames
 
         private:
             // Compile-time interface validation
-            static_assert(FRAME_SIZE > 0, "FRAME_SIZE must be positive");
-            static_assert(CONFIG_SIZE > 0, "CONFIG_SIZE must be positive");
+            static_assert(FRAME_SIZE == 20, "FRAME_SIZE must 20 bytes");
+            static_assert(BITMAP_SIZE == 4, "CONFIG_SIZE must be 4 bytes");
             static_assert(!std::is_void_v<StorageType>, "StorageType must be defined");
-            static_assert(!std::is_void_v<ConfigType>, "ConfigType must be defined");
-            static_assert(!std::is_void_v<BaudType>, "BaudType must be defined");
-            static_assert(!std::is_void_v<ModeType>, "ModeType must be defined");
+            static_assert(!std::is_void_v<FilterType>, "FilterType must be defined");
+            static_assert(!std::is_void_v<MaskType>, "MaskType must be defined");
     };
 
     /**
@@ -380,12 +375,12 @@ namespace USBCANBridge {
         // Frame-specific size validation
         static_assert(
             [](){
-            if constexpr (std::is_same_v<T, VariableFrame> ) {
-                return Traits::MAX_FRAME_SIZE > 5 && Traits::MAX_FRAME_SIZE <= 15;
-            } else {
-                return Traits::FRAME_SIZE == 20;
-            }
-        }(),
+                if constexpr (std::is_same_v<T, VariableFrame> ) {
+                    return Traits::MAX_FRAME_SIZE > 5 && Traits::MAX_FRAME_SIZE <= 15;
+                } else {
+                    return Traits::FRAME_SIZE == 20;
+                }
+            }(),
             "Frame size must be positive and 20 for fixed frames, from 5 to 15 for "
             "variable frames");
 

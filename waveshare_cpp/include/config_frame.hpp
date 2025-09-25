@@ -14,9 +14,8 @@ namespace USBCANBridge {
 
     class ConfigFrame : public BaseFrame<ConfigFrame> {
         protected:
-            using ConfigType = typename Traits::ConfigType;
-            using BaudType = typename Traits::BaudType;
-            using ModeType = typename Traits::ModeType;
+            using FilterType = Traits::FilterType;
+            using MaskType = Traits::MaskType;
             alignas(4) mutable StorageType storage_ = {std::byte{0}};
             // dirty bit for lazy evaluation of checksum
             mutable bool dirty_ = true;
@@ -24,6 +23,10 @@ namespace USBCANBridge {
             mutable uint8_t checksum_ = 0;
 
         private:
+            /**
+             * @brief Initialize fixed fields of the configuration frame.
+             * @see ConfigCommandIndex in common.hpp for field details.
+             */
             void init_fixed_fields();
 
         public:
@@ -47,8 +50,6 @@ namespace USBCANBridge {
             Result<Status> impl_set_type(const Type& type);
             Result<FrameType> impl_get_frame_type() const;
             Result<Status> impl_set_frame_type(const FrameType& frame_type);
-            Result<FrameFmt> impl_get_frame_fmt() const;
-            Result<Status> impl_set_frame_fmt(const FrameFmt& frame_fmt);
 
             // * Wire protocol serialization/deserialization
             Result<StorageType> impl_serialize() const;
@@ -56,14 +57,14 @@ namespace USBCANBridge {
 
             // ? Configuration Frame specific Interface
 
-            Result<BaudType> get_baud_rate() const;
-            Result<Status> set_baud_rate(const BaudType& baud_rate);
-            Result<ModeType> get_can_mode() const;
-            Result<Status> set_can_mode(const ModeType& mode);
-            Result<ConfigType> get_id_filter() const;
-            Result<Status> set_id_filter(const ConfigType& filter);
-            Result<ConfigType> get_id_mask() const;
-            Result<Status> set_id_mask(const ConfigType& mask);
+            Result<CANBaud> get_baud_rate() const;
+            Result<Status> set_baud_rate(const CANBaud& baud_rate);
+            Result<CANMode> get_can_mode() const;
+            Result<Status> set_can_mode(const CANMode& mode);
+            Result<FilterType> get_id_filter() const;
+            Result<Status> set_id_filter(const FilterType& filter);
+            Result<MaskType> get_id_mask() const;
+            Result<Status> set_id_mask(const MaskType& mask);
 
             // * Validation methods
             Result<Status> impl_validate() const;
@@ -72,13 +73,11 @@ namespace USBCANBridge {
             Result<Status> validate_header_byte() const;
             Result<Status> validate_type(const Type& type) const;
             Result<Status> validate_frame_type(const FrameType& frame_type) const;
-            Result<Status> validate_frame_fmt(const FrameFmt& frame_fmt) const;
-            Result<Status> validate_baud_rate(const BaudType& baud_rate) const;
-            Result<Status> validate_can_mode(const ModeType& mode) const;
-            Result<Status> validate_id_filter(const ConfigType& filter) const;
-            Result<Status> validate_id_mask(const ConfigType& mask) const;
+            Result<Status> validate_baud_rate(const CANBaud& baud_rate) const;
+            Result<Status> validate_can_mode(const CANMode& mode) const;
+            Result<Status> validate_id_filter(const FilterType& filter) const;
+            Result<Status> validate_id_mask(const MaskType& mask) const;
             Result<Status> validate_reserved_byte() const;
-            Result<Status> validate_checksum() const;
             // ? Checksum specific methods
             /**
              * @brief Calculate checksum for the current configuration frame over the bytes:
@@ -103,15 +102,26 @@ namespace USBCANBridge {
                     // Use polymorphic checksum utility
                     checksum_ = ChksmUtil::calculateChecksum<ConfigFrame>(storage_);
                     dirty_ = false;
-                    storage_[to_size_t(ConfigCommandIndex::CHECKSUM)] = to_byte(checksum_);
+                    storage_[to_size_t(ConfigCommandIndex::CHECKSUM)] =
+                        static_cast<std::byte>(checksum_);
                 }
                 return Result<Status>::success(Status::SUCCESS);
             }
             /**
              * @brief Validate the checksum of the current configuration frame.
+             * If the dirty_ flag is set, the checksum is updated before validation.
+             *
+             * @param frame The configuration frame to validate.
              * @return Result<Status>
              */
             Result<Status> validateChecksum(const ConfigFrame& frame) const {
+                if (dirty_) {
+                    // Update checksum if frame is dirty
+                    auto res = updateChecksum();
+                    if (res.fail()) {
+                        return res;
+                    }
+                }
                 // Use polymorphic checksum utility
                 return ChksmUtil::validateChecksum<ConfigFrame>(frame.storage_);
             }
