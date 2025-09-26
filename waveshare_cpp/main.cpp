@@ -49,6 +49,8 @@ static int adapter_init(const char* tty_device, int baudrate) {
 }
 
 int main() {
+
+
     FixedFrame fixed_frame;
     ConfigFrame config_frame;
 
