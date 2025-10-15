@@ -8,8 +8,7 @@
             "includePath": [
                 "/opt/ros/jazzy/include/**",
                 "/usr/include/**",
-                "${workspaceFolder}/**",
-                "${workspaceFolder}/src/ros2_waveshare/include"
+                "${workspaceFolder}/src/**"
             ],
             "name": "ros2",
             "intelliSenseMode": "gcc-x64",

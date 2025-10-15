@@ -21,6 +21,12 @@ RUN apt update && sudo apt full-upgrade -y && apt install -y --no-install-recomm
     apt-utils \
     build-essential \
     ca-certificates \
+    can-utils \
+    clang-format \
+    clang-tidy \
+    cmake-format \
+    clang \
+    clangd \
     ccache \
     cmake \
     cppcheck \
@@ -66,8 +72,19 @@ RUN apt update && sudo apt full-upgrade -y && apt install -y --no-install-recomm
     python3-argcomplete \
     python3-autopep8 \
     python3-dev \
+    python3-flake8 \
+    python3-flake8-class-newline \
+    python3-flake8-deprecated \
+    python3-flake8-docstrings \
+    python3-flake8-import-order \
+    python3-flake8-quotes \
+    python3-flake8-mutable \
+    python3-pep8-naming \
     python3-pip \
     python3-pygments \
+    python3-pytest \
+    python3-pytest-cov \
+    python3-pytest-flake8 \
     python3-pytest-pylint \
     python3-venv \
     shellcheck \
@@ -112,9 +129,6 @@ RUN echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
 
 # Set workspace directory ownership
 RUN mkdir -p ${WORKSPACE} && chown -R ${USERNAME}:${USERNAME} ${WORKSPACE}
-
-# Condigure Git to accept different ownerships for local repository clones
-RUN git config --system --add safe.directory '*'
 
 # Configure ZSH for the user
 COPY --chmod=755 scripts/configure_zsh.sh /tmp/configure_zsh.sh
@@ -181,12 +195,6 @@ RUN apt update && apt install -y \
     ros-${ROS_DISTRO}-ament-cmake-catch2 \
     ros-${ROS_DISTRO}-catch-ros2 \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies for the user
-#! Environment is externally managed, so this step is commented out
-# COPY requirements.txt /tmp/requirements.txt
-# RUN pip install --no-cache-dir -r /tmp/requirements.txt || true \
-    # && rm /tmp/requirements.txt
 
 # Final cleanup
 RUN apt autoremove -y \

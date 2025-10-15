@@ -113,20 +113,8 @@
     "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": true,
     "python.formatting.provider": "autopep8",
-    // C++ settings for ROS2 development
-    "C_Cpp.default.intelliSenseMode": "linux-gcc-x64",
-    "C_Cpp.default.compilerPath": "/usr/bin/gcc",
-    "C_Cpp.default.cStandard": "c11",
-    "C_Cpp.default.cppStandard": "c++17",
-    "C_Cpp.default.includePath": [
-        "/opt/ros/jazzy/include/**",
-        "/usr/include/**",
-        "${workspaceFolder}/src/**/**/include",
-        "${workspaceFolder}/src/**/include",
-        "${workspaceFolder}/src/**"
-    ],
     // Terminal settings
-    "terminal.integrated.shell.linux": "/bin/bash",
+    "terminal.integrated.shell.linux": "/bin/zsh",
     "terminal.integrated.env.linux": {
         "ROS_DOMAIN_ID": "42"
     },
@@ -155,6 +143,7 @@
     "ROS2.distro": "jazzy",
     "python.autoComplete.extraPaths": [
         "/opt/ros/jazzy/lib/python3.12/site-packages",
+        "/opt/ros/${env:ROS_DISTRO}/lib/ros_site_packages/",
         "${workspaceFolder}/src"
     ],
     "python.analysis.extraPaths": [
@@ -162,21 +151,77 @@
         "${workspaceFolder}/src"
     ],
     "python.analysis.autoImportCompletions": true,
+    "python.envFile": "${workspaceFolder}/.env",
+    "autopep8.args": [
+        "--max-line-length=100"
+    ],
     "cmake.ignoreCMakeListsMissing": true,
     "github.copilot.chat.codeGeneration.useInstructionFiles": true,
+    "C_Cpp.formatting": "disabled",
+    "uncrustify.configPath.linux": "/opt/ros/${env:ROS_DISTRO}/lib/ros_site_packages/ament_uncrustify/configuration/ament_code_style.cfg",
+    "[cpp]": {
+        "editor.defaultFormatter": "zachflower.uncrustify"
+    },
+    "cSpell.allowCompoundWords": true,
     "cSpell.words": [
+        "ament",
+        "amentindex",
+        "amentlint",
+        "amenttool",
+        "amentuncrustify",
+        "autopep",
         "canopen",
         "canusb",
+        "ccache",
+        "clangd",
+        "cmake",
+        "colcon",
+        "colconbuild",
+        "colcontest",
+        "cppcheck",
         "DALREADY",
+        "DCMAKE",
+        "doxygen",
+        "direnv",
+        "dirmngr",
         "Efficace",
         "ffmt",
+        "gazebo",
+        "gazebosim",
+        "gdbserver",
+        "ignition",
         "kbps",
+        "libasio",
+        "libboost",
+        "libtbb",
+        "osrf",
+        "pygments",
+        "pylint",
+        "pytest",
         "rclcpp",
+        "rosdep",
+        "rosdistro",
+        "ROS_DISTRO",
+        "rosidl",
+        "rosinstall",
+        "roslaunch",
         "TCGETS",
         "TCSETS",
+        "uncrustify",
         "USBCANRTX",
         "Waveshare",
         "WBAD",
-        "xacro"
-    ]
+        "Werror",
+        "Wextra",
+        "Wpedantic",
+        "xacro",
+        "xmllint"
+    ],
+    "cSpell.ignorePaths": [
+        "**/.git/objects/**",
+        ".vscode",
+        ".vscode-insiders",
+        ".devcontainer/devcontainer.json"
+    ],
+    "ament-task-provider.envSetup": "source /opt/ros/${env:ROS_DISTRO}/setup.bash",
 }

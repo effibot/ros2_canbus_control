@@ -5,7 +5,7 @@
 
 # eza aliases (modern ls replacement)
 alias ls='eza --icons --group-directories-first --color=always --follow-symlinks'
-alias ll='ll -l'
+alias ll='ls -l'
 alias la='ls -la'
 alias lt='ls --tree'
 alias lta='ls --tree -a'
