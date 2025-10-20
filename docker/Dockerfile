@@ -65,6 +65,7 @@ RUN apt update && sudo apt full-upgrade -y && apt install -y --no-install-recomm
     net-tools \
     nfs-common \
     ninja-build \
+    npm \
     openssh-client \
     openssl \
     pkg-config \

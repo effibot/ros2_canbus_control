@@ -195,6 +195,7 @@
         "gazebo",
         "gazebosim",
         "gdbserver",
+        "GNUCXX",
         "ignition",
         "isort",
         "kbps",
@@ -243,4 +244,5 @@
         "**/log/**"
     ],
     "ament-task-provider.envSetup": "source /opt/ros/${env:ROS_DISTRO}/setup.bash",
+    "cmake.options.statusBarVisibility": "visible",
 }

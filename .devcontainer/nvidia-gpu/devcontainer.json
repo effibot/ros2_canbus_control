@@ -35,7 +35,6 @@
                 "ms-vscode.cmake-tools",
                 "ms-vscode.copilot-mermaid-diagram",
                 "ms-vscode.cpptools",
-                "ms-vscode.makefile-tools",
                 "mtsmfm.vscode-stl-viewer",
                 "njpwerner.autodocstring",
                 "nopeslide.vscode-drawio-plugin-mermaid",
@@ -49,7 +48,13 @@
                 "zachflower.uncrustify",
                 "matepek.vscode-catch2-test-adapter",
                 "Guyutongxue.cpp-reference",
-                "littlefoxteam.vscode-python-test-adapter"
+                "littlefoxteam.vscode-python-test-adapter",
+                "ms-vscode.vscode-serial-monitor",
+                "tdjastrzebski.vscode-cppbuild",
+                "tdennis4496.cmantic",
+                "usernamehw.errorlens",
+                "yzhang.markdown-all-in-one",
+                "shd101wyy.markdown-preview-enhanced"
             ],
             "settings": {
                 "python.defaultInterpreterPath": "/usr/bin/python3",
