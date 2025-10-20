@@ -12,37 +12,41 @@
     "customizations": {
         "vscode": {
             "extensions": [
-                // --- C/C++ ---
-                "ms-vscode.cpptools",
+                "AykutSarac.jsoncrack-vscode",
+                "KevinRose.vsc-python-indent",
+                "MermaidChart.vscode-mermaid-chart",
+                "Ranch-Hand-Robotics.rde-pack",
+                "Upstash.context7-mcp",
+                "betwo.b2-catkin-tools",
+                "betwo.vscode-doxygen-runner",
+                "bbenoist.Doxygen",
+                "cschlosser.doxdocgen",
+                "eamodio.gitlens",
+                "edwinhuish.better-comments-next",
+                "foxundermoon.shell-format",
+                "janisdd.vscode-edit-csv",
+                "mechatroner.rainbow-csv",
+                "mgesbert.python-path",
+                "ms-python.autopep8",
+                "ms-python.flake8",
+                "ms-python.isort",
+                "ms-python.pylint",
+                "ms-python.python",
                 "ms-vscode.cmake-tools",
+                "ms-vscode.copilot-mermaid-diagram",
+                "ms-vscode.cpptools",
                 "ms-vscode.makefile-tools",
                 "mtsmfm.vscode-stl-viewer",
-                "zachflower.uncrustify",
-                // --- Python ---
-                "ms-python.python",
-                "ms-python.pylint",
-                "ms-python.flake8",
-                "ms-python.autopep8",
-                "ms-python.isort",
-                "KevinRose.vsc-python-indent",
-                "mgesbert.python-path",
                 "njpwerner.autodocstring",
-                "rodolphebarbanneau.python-docstring-highlighter",
-                // --- Doxygen / documentazione ---
-                "bbenoist.Doxygen",
-                "betwo.vscode-doxygen-runner",
-                "cschlosser.doxdocgen",
-                // --- Robotica / ROS / URDF ---
-                "smilerobotics.urdf",
-                "betwo.b2-catkin-tools",
-                "Ranch-Hand-Robotics.rde-pack",
-                // --- XML / YAML ---
+                "nopeslide.vscode-drawio-plugin-mermaid",
                 "redhat.vscode-xml",
                 "redhat.vscode-yaml",
-                // --- Utilità generali ---
-                "eamodio.gitlens",
+                "rodolphebarbanneau.python-docstring-highlighter",
+                "shardulm94.trailing-spaces",
+                "smilerobotics.urdf",
                 "streetsidesoftware.code-spell-checker",
-                "edwinhuish.better-comments-next"
+                "timonwong.shellcheck",
+                "zachflower.uncrustify"
             ],
             "settings": {
                 "python.defaultInterpreterPath": "/usr/bin/python3",

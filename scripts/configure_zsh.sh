@@ -18,7 +18,7 @@ if [ ! -d "${HOME_DIR}/.cache" ]; then
     mkdir -p "${HOME_DIR}/.cache"
 # if the folder exists, check that the permissions are correct
 # if the folder belongs to root, change the ownership. It must be done with sudo
-elif [ "$(stat -c %U ${HOME_DIR}/.cache)" = "root" ]; then
+elif [ "$(stat -c %U "${HOME_DIR}/.cache")" = "root" ]; then
     sudo chown -R "$USERNAME":"$USERNAME" "${HOME_DIR}/.cache"
 fi
 

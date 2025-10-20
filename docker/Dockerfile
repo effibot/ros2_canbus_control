@@ -168,8 +168,6 @@ RUN rm -rf /tmp/scripts \
     && apt autoclean \
     && rm -rf /var/lib/apt/lists/*
 
-
-
 ENV DEBIAN_FRONTEND=
 
 FROM base AS full
@@ -184,16 +182,17 @@ RUN /tmp/setup_ros2_environment.sh && rm /tmp/setup_ros2_environment.sh
 
 # Install core ROS 2 packages
 RUN apt update && apt install -y \
-    ros-${ROS_DISTRO}-plotjuggler-ros \
-    ros-${ROS_DISTRO}-rqt* \
     ros-${ROS_DISTRO}-ament-* \
-    ros-${ROS_DISTRO}-rviz2 \
-    ros-${ROS_DISTRO}-rosbag2* \
-    ros-${ROS_DISTRO}-canopen* \
-    ros-${ROS_DISTRO}-navigation2 \
-    ros-${ROS_DISTRO}-nav2-bringup \
     ros-${ROS_DISTRO}-ament-cmake-catch2 \
+    ros-${ROS_DISTRO}-canopen* \
     ros-${ROS_DISTRO}-catch-ros2 \
+    ros-${ROS_DISTRO}-nav2-bringup \
+    ros-${ROS_DISTRO}-navigation2 \
+    ros-${ROS_DISTRO}-plotjuggler-ros \
+    ros-${ROS_DISTRO}-rosbag2* \
+    ros-${ROS_DISTRO}-rqt* \
+    ros-${ROS_DISTRO}-rviz2 \
+    ros-jazzy-nlohmann-json-schema-validator-vendor \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Final cleanup
