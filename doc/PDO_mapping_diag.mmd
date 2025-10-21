@@ -1,0 +1,62 @@
+sequenceDiagram
+    participant Master as CANopen Master<br/>(USB-CAN-A)
+    participant Bus as CAN Bus
+    participant Slave as TRAC_PWR Drive<br/>(Node ID 2)
+    
+    Note over Master,Slave: Phase 1: Disable PDO
+    Master->>Bus: SDO Write 0x1400.01 = 0xC0000202<br/>(Disable RPDO1, COB-ID=0x202)
+    Bus->>Slave: SDO Request
+    Slave->>Bus: SDO Response (ACK)
+    Bus->>Master: Confirmation
+    
+    Note over Master,Slave: Phase 2: Configure Communication
+    Master->>Bus: SDO Write 0x1400.02 = 0xFF<br/>(Transmission Type: Async)
+    Bus->>Slave: SDO Request
+    Slave->>Bus: SDO Response (ACK)
+    Bus->>Master: Confirmation
+    
+    Master->>Bus: SDO Write 0x1400.03 = 0x07D0<br/>(Inhibit Time: 200ms)
+    Bus->>Slave: SDO Request
+    Slave->>Bus: SDO Response (ACK)
+    Bus->>Master: Confirmation
+    
+    Note over Master,Slave: Phase 3: Clear Existing Mappings
+    Master->>Bus: SDO Write 0x1600.00 = 0x00<br/>(Clear mapping count)
+    Bus->>Slave: SDO Request
+    Slave->>Bus: SDO Response (ACK)
+    Bus->>Master: Confirmation
+    
+    Note over Master,Slave: Phase 4: Map Objects
+    Master->>Bus: SDO Write 0x1600.01 = 0x60400010<br/>(Map 0x6040.00, 16 bits)
+    Bus->>Slave: SDO Request
+    Slave->>Bus: SDO Response (ACK)
+    Bus->>Master: Confirmation
+    
+    Master->>Bus: SDO Write 0x1600.02 = 0x60FF0020<br/>(Map 0x60FF.00, 32 bits)
+    Bus->>Slave: SDO Request
+    Slave->>Bus: SDO Response (ACK)
+    Bus->>Master: Confirmation
+    
+    Note over Master,Slave: Phase 5: Finalize Mapping
+    Master->>Bus: SDO Write 0x1600.00 = 0x02<br/>(Set mapping count = 2)
+    Bus->>Slave: SDO Request
+    Slave->>Bus: SDO Response (ACK)
+    Bus->>Master: Confirmation
+    
+    Note over Master,Slave: Phase 6: Enable PDO
+    Master->>Bus: SDO Write 0x1400.01 = 0x40000202<br/>(Enable RPDO1)
+    Bus->>Slave: SDO Request
+    Slave->>Bus: SDO Response (ACK)
+    Bus->>Master: Confirmation
+    
+    Note over Master,Slave: Phase 7: Real-Time Operation
+    loop Every Control Cycle
+        Master->>Bus: PDO Frame 0x202: [CW_LSB, CW_MSB, VEL_0, VEL_1, VEL_2, VEL_3]
+        Bus->>Slave: Data delivered to 0x6040 & 0x60FF
+        Note over Slave: Drive updates control word<br/>and target velocity
+    end
+    
+    Note over Master,Slave: Example: Send Control Word=0x0F, Velocity=1234 rpm
+    Master->>Bus: PDO 0x202: [0x0F, 0x00, 0xD2, 0x04, 0x00, 0x00]
+    Bus->>Slave: Control=0x000F, Velocity=1234
+    Slave->>Slave: Execute motor control

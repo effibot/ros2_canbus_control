@@ -1,0 +1,7 @@
+# List of repositories to use within your workspace
+
+repositories:
+  waveshare_cpp:
+    type: git
+    url: https://github.com/effibot/waveshare_cpp.git
+    version: main
