@@ -5,6 +5,7 @@ This document explains the PDO (Process Data Object) configuration in `bus.yml` 
 ## Overview
 
 The configuration includes:
+
 - **24 SDO parameters** for initialization
 - **4 RPDOs** (Receive PDOs - Controller → Device)
 - **4 TPDOs** (Transmit PDOs - Device → Controller)
@@ -193,6 +194,7 @@ TPDOs carry feedback from the device to the controller. Data flows: **Device →
 ## PDO Size Limits
 
 CANopen PDO size constraints:
+
 - **Maximum PDO payload**: 8 bytes (CAN 2.0A/B)
 - **All configured PDOs comply** with this limit
 
@@ -206,19 +208,23 @@ CANopen PDO size constraints:
 ## Usage Recommendations
 
 ### For Position Control (Profile Position Mode)
+
 - **Use**: RPDO1 (control word + target position)
 - **Monitor**: TPDO1 (status word + position actual)
 - **Sync Period**: 10ms (as configured in master settings)
 
 ### For Velocity Control (Profile Velocity Mode)
+
 - **Use**: RPDO2 (mode + target velocity)
 - **Monitor**: TPDO1 (status word + velocity actual)
 
 ### For Error Monitoring
+
 - **Monitor**: TPDO2 (error register + following error)
 - **Check**: Error register bits (0x1001)
 
 ### For Digital I/O
+
 - **Control**: RPDO4 (digital outputs)
 - **Monitor**: TPDO3 (digital inputs)
 
@@ -230,10 +236,10 @@ Edit `bus.yml` under the `sdo:` section. Example:
 
 ```yaml
 # Increase velocity limit
-- {index: 0x607F, sub_index: 0, value: 100000}  # Max profile velocity
+- { index: 0x607F, sub_index: 0, value: 100000 } # Max profile velocity
 
 # Tighter position window
-- {index: 0x6067, sub_index: 0, value: 50}      # Position window
+- { index: 0x6067, sub_index: 0, value: 50 } # Position window
 ```
 
 ### Modifying PDO Mappings
@@ -246,18 +252,19 @@ To change what data is transmitted in a PDO:
 4. **Enable the PDO**: Clear COB-ID bit 31
 
 Example (not directly in bus.yml, requires SDO writes):
+
 ```yaml
 sdo:
   # Disable TPDO1
-  - {index: 0x1800, sub_index: 1, value: 0x80000180}
+  - { index: 0x1800, sub_index: 1, value: 0x80000180 }
   # Clear mapping count
-  - {index: 0x1A00, sub_index: 0, value: 0}
+  - { index: 0x1A00, sub_index: 0, value: 0 }
   # Add custom mapping (example: only status word + position)
-  - {index: 0x1A00, sub_index: 1, value: 0x60410010}  # Status word (16 bits)
-  - {index: 0x1A00, sub_index: 2, value: 0x60640020}  # Position (32 bits)
-  - {index: 0x1A00, sub_index: 0, value: 2}           # 2 objects mapped
+  - { index: 0x1A00, sub_index: 1, value: 0x60410010 } # Status word (16 bits)
+  - { index: 0x1A00, sub_index: 2, value: 0x60640020 } # Position (32 bits)
+  - { index: 0x1A00, sub_index: 0, value: 2 } # 2 objects mapped
   # Enable TPDO1
-  - {index: 0x1800, sub_index: 1, value: 0x00000180}
+  - { index: 0x1800, sub_index: 1, value: 0x00000180 }
 ```
 
 ### Enabling TPDO4 (Cam Functionality)
@@ -269,25 +276,28 @@ tpdo:
   - index: 0x1A03
     cob_id: "auto"
     transmission: 0xFF
-    enabled: true  # Change from false to true
+    enabled: true # Change from false to true
     mapping:
-      - {index: 0x6300, sub_index: 1}
-      - {index: 0x607E, sub_index: 0}
+      - { index: 0x6300, sub_index: 1 }
+      - { index: 0x607E, sub_index: 0 }
 ```
 
 ## Troubleshooting
 
 ### PDO Not Updating
+
 - Check if SYNC messages are being sent (sync_period in master config)
 - Verify COB-ID is not disabled (bit 31 = 0 for enabled)
 - Ensure device is in OPERATIONAL state
 
 ### Data Mismatch
+
 - Verify data types match between mapping and application
 - Check byte order (CANopen uses little-endian)
 - Confirm PDO mapping matches EDS file definitions
 
 ### Performance Issues
+
 - Reduce SYNC period if too slow (increase frequency)
 - Use asynchronous TPDOs for status that changes infrequently
 - Minimize number of enabled PDOs

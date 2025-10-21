@@ -14,9 +14,9 @@ export ZDOTDIR="${ZDOTDIR:-${HOME}/.config/zsh}"
 curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh
 
 # Configure zoxide in bashrc
-echo "" >> "${HOME}/.bashrc"
-echo "# zoxide setup" >> "${HOME}/.bashrc"
-echo "eval \"\$(zoxide init bash --cmd cd)\"" >> "${HOME}/.bashrc"
+
+# trunk-ignore(shellcheck/SC2016)
+echo 'eval "$(zoxide init bash --cmd cd)"' >>"${HOME}/.bashrc"
 
 # Configure zoxide in zshrc (using ZDOTDIR)
 #mkdir -p "${ZDOTDIR}"

@@ -14,9 +14,9 @@ export ZDOTDIR="${ZDOTDIR:-${HOME}/.config/zsh}"
 curl -sS https://starship.rs/install.sh | sh -s -- -y
 
 # Configure starship in bashrc
-echo "" >> "${HOME}/.bashrc"
-echo "# starship setup" >> "${HOME}/.bashrc"
-echo "eval \"\$(starship init bash)\"" >> "${HOME}/.bashrc"
+
+# trunk-ignore(shellcheck/SC2016)
+echo 'eval "$(starship init bash)"' >>"${HOME}/.bashrc"
 
 # Configure starship in zshrc (using ZDOTDIR)
 #mkdir -p "${ZDOTDIR}"
@@ -29,6 +29,6 @@ mkdir -p "${HOME}/.config"
 touch "${HOME}/.config/starship.toml"
 
 # Configure starship theme
-starship preset gruvbox-rainbow >> "${HOME}/.config/starship.toml"
+starship preset gruvbox-rainbow >>"${HOME}/.config/starship.toml"
 
 echo "starship installation complete!"

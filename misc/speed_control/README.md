@@ -17,7 +17,7 @@ The **Speed Control** package is responsible for:
 
 The package follows a modular design with clear separations between interfaces, implementations, and configuration files. Below is the directory layout and description of each major component:
 
-```
+```bash
 (speed_control)
 ├── CMakeLists.txt             # Build configuration for CMake
 ├── package.xml                # ROS2 package manifest

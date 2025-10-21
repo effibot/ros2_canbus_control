@@ -26,21 +26,21 @@ alias ....='cd ../../..'
 
 # Git aliases (if git is available)
 if command -v git >/dev/null 2>&1; then
-    alias gs='git status'
-    alias ga='git add'
-    alias gc='git commit'
-    alias gp='git push'
-    alias gl='git log --oneline'
-    alias gd='git diff'
+	alias gs='git status'
+	alias ga='git add'
+	alias gc='git commit'
+	alias gp='git push'
+	alias gl='git log --oneline'
+	alias gd='git diff'
 fi
 
 # ROS 2 aliases
-if [ -n "${ROS_DISTRO:-}" ]; then
-    alias cb='colcon build'
-    alias cbt='colcon build --cmake-target'
-    alias cbp='colcon build --packages-select'
-    alias cbs='colcon build --symlink-install'
-    alias ct='colcon test'
-    alias ctp='colcon test --packages-select'
-    alias rosdep_install='rosdep install --from-paths src --ignore-src -r -y'
+if [[ -n ${ROS_DISTRO-} ]]; then
+	alias cb='colcon build'
+	alias cbt='colcon build --cmake-target'
+	alias cbp='colcon build --packages-select'
+	alias cbs='colcon build --symlink-install'
+	alias ct='colcon test'
+	alias ctp='colcon test --packages-select'
+	alias rosdep_install='rosdep install --from-paths src --ignore-src -r -y'
 fi

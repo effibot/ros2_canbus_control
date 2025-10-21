@@ -17,7 +17,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # - System utilities
 # - Zsh shell
 # Then, add universe repository
-RUN apt update && sudo apt full-upgrade -y && apt install -y --no-install-recommends \
+RUN apt-get update && sudo apt-get full-upgrade -y && apt-get install -y --no-install-recommends \
     apt-utils \
     build-essential \
     ca-certificates \
@@ -111,6 +111,7 @@ RUN apt update && sudo apt full-upgrade -y && apt install -y --no-install-recomm
 RUN git config --system --add safe.directory '*'
 
 # Install nano syntax highlighting
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN curl https://raw.githubusercontent.com/scopatz/nanorc/master/install.sh | sh
 
 # Set up user environment variables
@@ -133,7 +134,7 @@ RUN mkdir -p ${WORKSPACE} && chown -R ${USERNAME}:${USERNAME} ${WORKSPACE}
 
 # Configure ZSH for the user
 COPY --chmod=755 scripts/configure_zsh.sh /tmp/configure_zsh.sh
-RUN runuser -l ${USERNAME} -c '/tmp/configure_zsh.sh ${USERNAME} ${HOME}' && rm /tmp/configure_zsh.sh
+RUN runuser -l ${USERNAME} -c "/tmp/configure_zsh.sh ${USERNAME} ${HOME}" && rm /tmp/configure_zsh.sh
 
 # Set ZDOTDIR environment variable to match ZSH configuration
 ENV ZDOTDIR=/home/${USERNAME}/.config/zsh
@@ -143,7 +144,7 @@ RUN runuser -l ${USERNAME} -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.r
     && chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/.cargo
 
 # Install eza via cargo
-RUN runuser -l ${USERNAME} -c '${HOME}/.cargo/bin/cargo install eza'
+RUN runuser -l ${USERNAME} -c "${HOME}/.cargo/bin/cargo install eza"
 
 # Install terminal enhancement tools
 COPY --chmod=755 scripts/install_*.sh /tmp/scripts/
@@ -165,9 +166,6 @@ RUN runuser -l ${USERNAME} -c '/tmp/scripts/install_gh_cli.sh'
 
 # Clean up installation scripts and apt cache
 RUN rm -rf /tmp/scripts \
-    && apt autoremove -y \
-    && apt autoclean \
-    && rm -rf /var/lib/apt/lists/*
 
 ENV DEBIAN_FRONTEND=
 
@@ -182,7 +180,7 @@ COPY --chmod=755 scripts/setup_ros2_environment.sh /tmp/setup_ros2_environment.s
 RUN /tmp/setup_ros2_environment.sh && rm /tmp/setup_ros2_environment.sh
 
 # Install core ROS 2 packages
-RUN apt update && apt install -y \
+RUN apt-get update && apt-get install -y \
     ros-${ROS_DISTRO}-ament-* \
     ros-${ROS_DISTRO}-ament-cmake-catch2 \
     ros-${ROS_DISTRO}-canopen* \
@@ -197,8 +195,8 @@ RUN apt update && apt install -y \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Final cleanup
-RUN apt autoremove -y \
-    && apt clean \
+RUN apt-get autoremove -y \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 ENV DEBIAN_FRONTEND=
@@ -213,18 +211,28 @@ COPY --chmod=755 scripts/install_gazebo.sh /tmp/install_gazebo.sh
 RUN /tmp/install_gazebo.sh ${ROS_DISTRO} && rm /tmp/install_gazebo.sh
 
 # Install simulation-specific ROS 2 packages
-RUN apt update && apt install -y \
+RUN apt-get update \
+    && apt-get install -y \
     ros-${ROS_DISTRO}-ros-gz*
 
 # Final cleanup
-RUN apt autoremove -y \
-    && apt clean \
+RUN apt-get autoremove -y \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
-
-ENV DEBIAN_FRONTEND=
 
 FROM sim AS app
 
+# Set working directory
+WORKDIR ${WORKSPACE}
+
+# Add healthcheck for app stage
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD [ -d "${WORKSPACE}" ] && pgrep -u ${USERNAME} > /dev/null || exit 1
+
+# Switch to non-root user
+USER ${USERNAME}
+
+ENV DEBIAN_FRONTEND=
 # Set working directory
 WORKDIR ${WORKSPACE}
 

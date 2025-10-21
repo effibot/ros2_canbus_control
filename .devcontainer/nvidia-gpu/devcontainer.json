@@ -1,98 +1,96 @@
 {
-    "name": "ROS2 CAN Bus Control - NVIDIA GPU",
-    "dockerComposeFile": [
-        "compose.yaml"
-    ],
-    "service": "ros2_jazzy",
-    "workspaceFolder": "/home/ubuntu/ros_ws",
-    "shutdownAction": "stopCompose",
-    "hostRequirements": {
-        "gpu": "optional"
-    },
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "AykutSarac.jsoncrack-vscode",
-                "KevinRose.vsc-python-indent",
-                "MermaidChart.vscode-mermaid-chart",
-                "Ranch-Hand-Robotics.rde-pack",
-                "Upstash.context7-mcp",
-                "betwo.b2-catkin-tools",
-                "betwo.vscode-doxygen-runner",
-                "bbenoist.Doxygen",
-                "cschlosser.doxdocgen",
-                "eamodio.gitlens",
-                "edwinhuish.better-comments-next",
-                "foxundermoon.shell-format",
-                "janisdd.vscode-edit-csv",
-                "mechatroner.rainbow-csv",
-                "mgesbert.python-path",
-                "ms-python.autopep8",
-                "ms-python.flake8",
-                "ms-python.isort",
-                "ms-python.pylint",
-                "ms-python.python",
-                "ms-vscode.cmake-tools",
-                "ms-vscode.copilot-mermaid-diagram",
-                "ms-vscode.cpptools",
-                "mtsmfm.vscode-stl-viewer",
-                "njpwerner.autodocstring",
-                "nopeslide.vscode-drawio-plugin-mermaid",
-                "redhat.vscode-xml",
-                "redhat.vscode-yaml",
-                "rodolphebarbanneau.python-docstring-highlighter",
-                "shardulm94.trailing-spaces",
-                "smilerobotics.urdf",
-                "streetsidesoftware.code-spell-checker",
-                "timonwong.shellcheck",
-                "zachflower.uncrustify",
-                "matepek.vscode-catch2-test-adapter",
-                "Guyutongxue.cpp-reference",
-                "littlefoxteam.vscode-python-test-adapter",
-                "ms-vscode.vscode-serial-monitor",
-                "tdjastrzebski.vscode-cppbuild",
-                "tdennis4496.cmantic",
-                "usernamehw.errorlens",
-                "yzhang.markdown-all-in-one",
-                "shd101wyy.markdown-preview-enhanced"
-            ],
-            "settings": {
-                "python.defaultInterpreterPath": "/usr/bin/python3",
-                "python.linting.enabled": true,
-                "python.linting.pylintEnabled": true,
-                "python.linting.flake8Enabled": true,
-                "python.formatting.provider": "autopep8",
-                "C_Cpp.default.intelliSenseMode": "linux-gcc-x64",
-                "C_Cpp.default.compilerPath": "/usr/bin/gcc",
-                "C_Cpp.default.cStandard": "gnu17",
-                "C_Cpp.default.cppStandard": "c++17",
-                "files.associations": {
-                    "*.repos": "yaml",
-                    "*.world": "xml",
-                    "*.xacro": "xml",
-                    "*.urdf": "xml",
-                    "*.sdf": "xml"
-                },
-                "terminal.integrated.shell.linux": "/bin/bash",
-                "ros.distro": "jazzy"
-            }
-        }
-    },
-    // Features for NVIDIA GPU
-    "features": {
-        "ghcr.io/devcontainers/features/nvidia-cuda:2": {
-            "installCudnn": true,
-            "installCudnnDev": true,
-            "installNvtx": true
-        }
-    },
-    // Mounts for Intel GPU and graphics
-    "mounts": [
-        "source=${localEnv:HOME}/.ssh,target=/home/ubuntu/.ssh,type=bind,readonly",
-        "source=${localWorkspaceFolder}/config/aliases.sh,target=/home/ubuntu/.bash_aliases,type=bind",
-        "source=${localWorkspaceFolder}/config/nanorc,target=/home/ubuntu/.nanorc,type=bind",
-        "source=${localWorkspaceFolder}/config/vimrc,target=/home/ubuntu/.vimrc,type=bind"
-    ],
-    // Set the default user
-    "remoteUser": "ubuntu"
+	"name": "ROS2 CAN Bus Control - NVIDIA GPU",
+	"dockerComposeFile": ["compose.yaml"],
+	"service": "ros2_jazzy",
+	"workspaceFolder": "/home/ubuntu/ros_ws",
+	"shutdownAction": "stopCompose",
+	"hostRequirements": {
+		"gpu": "optional"
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"AykutSarac.jsoncrack-vscode",
+				"KevinRose.vsc-python-indent",
+				"MermaidChart.vscode-mermaid-chart",
+				"Ranch-Hand-Robotics.rde-pack",
+				"Upstash.context7-mcp",
+				"betwo.b2-catkin-tools",
+				"betwo.vscode-doxygen-runner",
+				"bbenoist.Doxygen",
+				"cschlosser.doxdocgen",
+				"eamodio.gitlens",
+				"edwinhuish.better-comments-next",
+				"foxundermoon.shell-format",
+				"janisdd.vscode-edit-csv",
+				"mechatroner.rainbow-csv",
+				"mgesbert.python-path",
+				"ms-python.autopep8",
+				"ms-python.flake8",
+				"ms-python.isort",
+				"ms-python.pylint",
+				"ms-python.python",
+				"ms-vscode.cmake-tools",
+				"ms-vscode.copilot-mermaid-diagram",
+				"ms-vscode.cpptools",
+				"mtsmfm.vscode-stl-viewer",
+				"njpwerner.autodocstring",
+				"nopeslide.vscode-drawio-plugin-mermaid",
+				"redhat.vscode-xml",
+				"redhat.vscode-yaml",
+				"rodolphebarbanneau.python-docstring-highlighter",
+				"shardulm94.trailing-spaces",
+				"smilerobotics.urdf",
+				"streetsidesoftware.code-spell-checker",
+				"timonwong.shellcheck",
+				"zachflower.uncrustify",
+				"matepek.vscode-catch2-test-adapter",
+				"Guyutongxue.cpp-reference",
+				"littlefoxteam.vscode-python-test-adapter",
+				"ms-vscode.vscode-serial-monitor",
+				"tdjastrzebski.vscode-cppbuild",
+				"tdennis4496.cmantic",
+				"usernamehw.errorlens",
+				"yzhang.markdown-all-in-one",
+				"shd101wyy.markdown-preview-enhanced"
+			],
+			"settings": {
+				"python.defaultInterpreterPath": "/usr/bin/python3",
+				"python.linting.enabled": true,
+				"python.linting.pylintEnabled": true,
+				"python.linting.flake8Enabled": true,
+				"python.formatting.provider": "autopep8",
+				"C_Cpp.default.intelliSenseMode": "linux-gcc-x64",
+				"C_Cpp.default.compilerPath": "/usr/bin/gcc",
+				"C_Cpp.default.cStandard": "gnu17",
+				"C_Cpp.default.cppStandard": "c++17",
+				"files.associations": {
+					"*.repos": "yaml",
+					"*.world": "xml",
+					"*.xacro": "xml",
+					"*.urdf": "xml",
+					"*.sdf": "xml"
+				},
+				"terminal.integrated.shell.linux": "/bin/bash",
+				"ros.distro": "jazzy"
+			}
+		}
+	},
+	// Features for NVIDIA GPU
+	"features": {
+		"ghcr.io/devcontainers/features/nvidia-cuda:2": {
+			"installCudnn": true,
+			"installCudnnDev": true,
+			"installNvtx": true
+		}
+	},
+	// Mounts for Intel GPU and graphics
+	"mounts": [
+		"source=${localEnv:HOME}/.ssh,target=/home/ubuntu/.ssh,type=bind,readonly",
+		"source=${localWorkspaceFolder}/config/aliases.sh,target=/home/ubuntu/.bash_aliases,type=bind",
+		"source=${localWorkspaceFolder}/config/nanorc,target=/home/ubuntu/.nanorc,type=bind",
+		"source=${localWorkspaceFolder}/config/vimrc,target=/home/ubuntu/.vimrc,type=bind"
+	],
+	// Set the default user
+	"remoteUser": "ubuntu"
 }

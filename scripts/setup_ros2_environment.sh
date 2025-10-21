@@ -9,33 +9,33 @@ set -e
 export ZDOTDIR="${ZDOTDIR:-${HOME}/.config/zsh}"
 
 # Check if required variables are set
-if [ -z "$ROS_DISTRO" ]; then
-    echo "Error: ROS_DISTRO environment variable is not set"
-    exit 1
+if [[ -z ${ROS_DISTRO} ]]; then
+	echo "Error: ROS_DISTRO environment variable is not set"
+	exit 1
 fi
 
-if [ -z "$USERNAME" ]; then
-    echo "Error: USERNAME environment variable is not set"
-    exit 1
+if [[ -z ${USERNAME} ]]; then
+	echo "Error: USERNAME environment variable is not set"
+	exit 1
 fi
 
-if [ -z "$HOME" ]; then
-    echo "Error: HOME environment variable is not set"
-    exit 1
+if [[ -z ${HOME} ]]; then
+	echo "Error: HOME environment variable is not set"
+	exit 1
 fi
 
-if [ -z "$WORKSPACE" ]; then
-    echo "Error: WORKSPACE environment variable is not set"
-    exit 1
+if [[ -z ${WORKSPACE} ]]; then
+	echo "Error: WORKSPACE environment variable is not set"
+	exit 1
 fi
 
-echo "Setting up ROS2 environment for user: $USERNAME"
-echo "ROS Distribution: $ROS_DISTRO"
-echo "Workspace: $WORKSPACE"
+echo "Setting up ROS2 environment for user: ${USERNAME}"
+echo "ROS Distribution: ${ROS_DISTRO}"
+echo "Workspace: ${WORKSPACE}"
 
 # Setup .bashrc
 echo "Configuring .bashrc..."
-cat >> $HOME/.bashrc << EOF
+cat >>"${HOME}"/.bashrc <<EOF
 
 # ROS2 Environment Setup
 source /opt/ros/${ROS_DISTRO}/setup.bash
@@ -63,7 +63,7 @@ echo "Configuring .zshrc..."
 # Ensure the ZSH config directory exists
 mkdir -p "${ZDOTDIR}"
 
-cat >> "${ZDOTDIR}/.zshrc" << EOF
+cat >>"${ZDOTDIR}/.zshrc" <<EOF
 
 # ROS2 Environment Setup
 source /opt/ros/${ROS_DISTRO}/setup.zsh

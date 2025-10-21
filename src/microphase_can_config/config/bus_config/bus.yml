@@ -8,9 +8,9 @@ master:
 
 echo_slave:
   node_id: 2
-  dcf: "TRACTION_PWR.eds"
+  dcf: TRACTION_PWR.eds
   package: canopen_proxy_driver
   driver: ros2_canopen::LifeCycleProxyDriver
   polling: true
   period: 10
-  namespace: "/test1"
+  namespace: /test1

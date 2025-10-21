@@ -56,6 +56,7 @@ This table lists all `PDOMapping=1` objects from `TRACTION_PWR.eds` within the s
 | 0x6302.1 | Cam polarity (Channel 1)        | 0x0005   | uint8_t  | 1    | -             | rww    | Cam output polarity     |
 
 ## Access Type Legend
+
 - **ro**: Read-only (device → controller)
 - **rw**: Read/write (bidirectional, persistent)
 - **rww**: Read/write, written (runtime write, may not persist)

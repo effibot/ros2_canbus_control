@@ -16,10 +16,9 @@ git clone --depth 1 https://github.com/junegunn/fzf.git "${HOME}/.fzf"
 "${HOME}/.fzf/install" --all --no-bash --no-zsh
 
 # Add fzf to PATH and configuration in .bashrc
-echo "" >> "${HOME}/.bashrc"
-echo "# fzf setup" >> "${HOME}/.bashrc"
-echo "export PATH=\"\${HOME}/.fzf/bin:\${PATH}\"" >> "${HOME}/.bashrc"
-echo "eval \"\$(fzf --bash)\"" >> "${HOME}/.bashrc"
+echo "export PATH=\"${HOME}/.fzf/bin:${PATH}\"" >>"${HOME}/.bashrc"
+# trunk-ignore(shellcheck/SC2016)
+echo 'eval "$(fzf --bash)"' >>"${HOME}/.bashrc"
 
 # Add fzf to PATH and configuration in zshrc (using ZDOTDIR)
 #mkdir -p "${ZDOTDIR}"

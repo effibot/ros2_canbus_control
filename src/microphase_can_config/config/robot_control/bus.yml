@@ -1,16 +1,17 @@
 options:
-  dcf_path: "@BUS_CONFIG_PATH@"
+  # trunk-ignore(yamllint/syntax)
+  dcf_path: @BUS_CONFIG_PATH@
 
 master:
   node_id: 1
-  driver: "ros2_canopen::MasterDriver"
-  package: "canopen_master_driver"
+  driver: ros2_canopen::MasterDriver
+  package: canopen_master_driver
   sync_period: 10000
 
 defaults:
-  dcf: "TRACTION_PWR.eds"
-  driver: "ros2_canopen::Cia402Driver"
-  package: "canopen_402_driver"
+  dcf: TRACTION_PWR.eds
+  driver: ros2_canopen::Cia402Driver
+  package: canopen_402_driver
   period: 10
   position_mode: 1
   revision_number: 1
@@ -61,7 +62,7 @@ defaults:
   # RPDO1: Control and command parameters
   rpdo:
     1:
-      cob_id: "auto"
+      cob_id: auto
       transmission: 0x01 # Synchronous
       enabled: true
       mapping:
@@ -71,7 +72,7 @@ defaults:
 
     # RPDO2: Velocity and mode control
     2:
-      cob_id: "auto"
+      cob_id: auto
       transmission: 0x01
       enabled: true
       mapping:
@@ -81,7 +82,7 @@ defaults:
 
     # RPDO3: Motion profile parameters
     3:
-      cob_id: "auto"
+      cob_id: auto
       transmission: 0xFF # Asynchronous
       enabled: true
       mapping:
@@ -90,7 +91,7 @@ defaults:
 
     # RPDO4: Digital outputs and interpolation
     4:
-      cob_id: "auto"
+      cob_id: auto
       transmission: 0xFF
       enabled: true
       mapping:
@@ -101,7 +102,7 @@ defaults:
   # TPDO1: Status and position feedback
   tpdo:
     1:
-      cob_id: "auto"
+      cob_id: auto
       transmission: 0x01 # Synchronous
       enabled: true
       mapping:
@@ -111,7 +112,7 @@ defaults:
 
     # TPDO2: Operation mode and error status
     2:
-      cob_id: "auto"
+      cob_id: auto
       transmission: 0x01
       enabled: true
       mapping:
@@ -122,7 +123,7 @@ defaults:
 
     # TPDO3: Digital I/O status
     3:
-      cob_id: "auto"
+      cob_id: auto
       transmission: 0xFF # Asynchronous (event-driven)
       enabled: true
       mapping:
@@ -131,7 +132,7 @@ defaults:
 
     # TPDO4: Cam and extended status
     4:
-      cob_id: "auto"
+      cob_id: auto
       transmission: 0xFF
       enabled: false # Disabled by default, enable if cam functionality needed
       mapping:

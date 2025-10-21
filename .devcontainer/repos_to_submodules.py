@@ -20,7 +20,9 @@ def add_git_submodule(repo_name, repo_url, repo_version):
         repo_url (str): The url of the repository to add
         repo_version (str): The version of the repository to add
     """
-    subprocess.call(['git', 'submodule', 'add', '-b', repo_version, repo_url, repo_name])
+    subprocess.call(
+        ["git", "submodule", "add", "-b", repo_version, repo_url, repo_name]
+    )
 
 
 def is_submodule(repo_name):
@@ -33,8 +35,11 @@ def is_submodule(repo_name):
         bool: True if it's a submodule, False otherwise.
     """
     try:
-        subprocess.check_output(['git', 'submodule', 'status', repo_name],
-                                stderr=subprocess.DEVNULL)
+        subprocess.check_output(
+            ["git", "submodule", "status", repo_name],
+            stderr=subprocess.DEVNULL,
+            shell=False,
+        )
         return True
     except subprocess.CalledProcessError:
         return False
@@ -46,14 +51,14 @@ def parse_repos_file(file_path):
     Args:
         file_path (str): The path to the folder that contains the repositories.
     """
-    with open(file_path, 'r', encoding='utf-8') as file:
+    with open(file_path, "r", encoding="utf-8") as file:
         repos_data = yaml.safe_load(file)
-        repositories = repos_data['repositories']
+        repositories = repos_data["repositories"]
 
         for repo_name, repo_info in repositories.items():
-            if 'type' in repo_info and repo_info['type'] == 'git':
-                repo_url = repo_info['url']
-                repo_version = repo_info['version']
+            if "type" in repo_info and repo_info["type"] == "git":
+                repo_url = repo_info["url"]
+                repo_version = repo_info["version"]
                 submodule_name = os.path.join(PREFIX, repo_name)
 
                 if not is_submodule(submodule_name):
@@ -62,7 +67,7 @@ def parse_repos_file(file_path):
 
 
 # Find .repos files within the src directory
-repos_files = glob.glob('src/**/*.repos', recursive=True)
+repos_files = glob.glob("src/**/*.repos", recursive=True)
 
 # Process each .repos file
 for repos_file in repos_files:

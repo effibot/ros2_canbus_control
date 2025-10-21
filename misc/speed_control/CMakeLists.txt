@@ -23,46 +23,37 @@ find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 
 # Publisher
-add_executable(speed_control src/speed_control.cpp src/frameManager.cpp src/mapPDO.cpp src/readStatusWord.cpp src/sendSDO.cpp src/tools.cpp)
-target_compile_features(speed_control PUBLIC c_std_99 cxx_std_17) # Require C99 and C++17
-target_include_directories(speed_control PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>)
-ament_target_dependencies(
-  speed_control
-  rclcpp
-  std_msgs)
+add_executable(
+  speed_control src/speed_control.cpp src/frameManager.cpp src/mapPDO.cpp
+                src/readStatusWord.cpp src/sendSDO.cpp src/tools.cpp)
+target_compile_features(speed_control PUBLIC c_std_99 cxx_std_17) # Require C99
+                                                                  # and C++17
+target_include_directories(
+  speed_control PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+                       $<INSTALL_INTERFACE:include>)
+ament_target_dependencies(speed_control rclcpp std_msgs)
 
 add_executable(noise_generator src/noiseGenerator.cpp)
 target_include_directories(
-  noise_generator PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:include>
-)
-ament_target_dependencies(
-  noise_generator
-  rclcpp
-  std_msgs)
+  noise_generator PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+                         $<INSTALL_INTERFACE:include>)
+ament_target_dependencies(noise_generator rclcpp std_msgs)
 
 # Install executables
-install(TARGETS speed_control
-  DESTINATION lib/${PROJECT_NAME})
+install(TARGETS speed_control DESTINATION lib/${PROJECT_NAME})
 
-install(TARGETS noise_generator 
-  DESTINATION lib/${PROJECT_NAME})
+install(TARGETS noise_generator DESTINATION lib/${PROJECT_NAME})
 
 # Install config files
-install(DIRECTORY config
-  DESTINATION share/speed_control)
+install(DIRECTORY config DESTINATION share/speed_control)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  # uncomment the line when a copyright and license is not present in all source files
-  #set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  # uncomment the line when this package is not in a git repo
-  #set(ament_cmake_cpplint_FOUND TRUE)
+  # the following line skips the linter which checks for copyrights uncomment
+  # the line when a copyright and license is not present in all source files
+  # set(ament_cmake_copyright_FOUND TRUE) the following line skips cpplint (only
+  # works in a git repo) uncomment the line when this package is not in a git
+  # repo set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 
