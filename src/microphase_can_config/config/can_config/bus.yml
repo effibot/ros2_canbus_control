@@ -1,23 +1,26 @@
+
+options:
+  dcf_path: "@BUS_CONFIG_PATH@"
+  
 master:
   node_id: 1
   driver: canopen_master_driver
-  bus: vcan0
-  baudrate: 500000
+  baudrate: 1000000  # Match your bridge CAN baud rate
 
 nodes:
   front_left_traction:
     node_id: 2
     driver: canopen_proxy_driver
-    eds_file: mini_traction_pwr.eds
+    dcf: eds/TRACTION_PWR.eds
   front_left_steer:
     node_id: 3
     driver: canopen_proxy_driver
-    eds_file: mini_traction_pwr.eds
+    dcf: eds/TRACTION_PWR.eds
   rear_right_traction:
     node_id: 4
     driver: canopen_proxy_driver
-    eds_file: mini_traction_pwr.eds
+    dcf: eds/TRACTION_PWR.eds
   rear_right_steer:
     node_id: 5
     driver: canopen_proxy_driver
-    eds_file: mini_traction_pwr.eds
+    dcf: eds/TRACTION_PWR.eds

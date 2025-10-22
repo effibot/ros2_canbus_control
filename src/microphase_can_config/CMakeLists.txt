@@ -13,8 +13,8 @@ find_package(canopen_base_driver REQUIRED)
 find_package(canopen_proxy_driver REQUIRED)
 find_package(lely_core_libraries REQUIRED)
 
-generate_dcf(bus_config)
-cogen_dcf(robot_control)
+cogen_dcf(can_config)
+
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)

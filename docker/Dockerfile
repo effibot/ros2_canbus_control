@@ -46,6 +46,7 @@ RUN apt-get update && sudo apt-get full-upgrade -y && apt-get install -y --no-in
     gnupg2 \
     htop \
     iproute2 \
+    isort \
     less \
     lcov \
     libasio-dev \
@@ -99,10 +100,12 @@ RUN apt-get update && sudo apt-get full-upgrade -y && apt-get install -y --no-in
     vim \
     wget \
     whois \
+    yamllint \
     zip \
     zsh \
     zsh-doc \
     zstd && \
+    npm i --global @biomejs/biome && \
     apt-get autoremove -y && \
     apt-get autoclean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*/apt/lists/*

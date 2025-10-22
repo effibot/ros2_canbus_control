@@ -12,45 +12,54 @@ def generate_launch_description():
     """Generate launch description with multiple components."""
     # path_file = os.path.dirname(__file__)
 
-    package_name = 'microphase_can_config'
-    bus_config_name = 'bus_config'
-    can_interface_name = os.getenv('CAN_INTERFACE_NAME', 'can0')
+    package_name = "microphase_can_config"
+    bus_config_name = "can_config"
+    can_interface_name = os.getenv("CAN_INTERFACE_NAME", "vcan0")  # Changed to vcan0
 
     ld = launch.LaunchDescription()
+
+    # Include Waveshare bridge launch
+    waveshare_bridge = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            [
+                os.path.join(get_package_share_directory("ros2_microphase"), "launch"),
+                "/bridge_bringup.launch.py",
+            ]
+        ),
+    )
 
     device_container = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
-                os.path.join(
-                    get_package_share_directory('canopen_core'), 'launch'
-                ),
-                '/canopen.launch.py',
+                os.path.join(get_package_share_directory("canopen_core"), "launch"),
+                "/canopen.launch.py",
             ]
         ),
         launch_arguments={
-            'master_config': os.path.join(
-                get_package_share_directory(f'{package_name}'),
-                'config',
-                f'{bus_config_name}',
-                'master.dcf',
+            "master_config": os.path.join(
+                get_package_share_directory(f"{package_name}"),
+                "config",
+                f"{bus_config_name}",
+                "master.dcf",
             ),
-            'master_bin': os.path.join(
-                get_package_share_directory(f'{package_name}'),
-                'config',
-                f'{bus_config_name}',
-                'master.bin',
+            "master_bin": os.path.join(
+                get_package_share_directory(f"{package_name}"),
+                "config",
+                f"{bus_config_name}",
+                "master.bin",
             ),
-            'bus_config': os.path.join(
-                get_package_share_directory(f'{package_name}'),
-                'config',
-                f'{bus_config_name}',
-                'bus.yml',
+            "bus_config": os.path.join(
+                get_package_share_directory(f"{package_name}"),
+                "config",
+                f"{bus_config_name}",
+                "bus.yml",
             ),
-            'can_interface_name': f'{can_interface_name}',
+            "can_interface_name": f"{can_interface_name}",
         }.items(),
-
     )
 
+    # Add actions to launch description
+    ld.add_action(waveshare_bridge)
     ld.add_action(device_container)
 
     return ld

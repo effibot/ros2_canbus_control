@@ -7,8 +7,9 @@
 			},
 			"includePath": [
 				"/opt/ros/jazzy/include/**",
-				"/home/ubuntu/ros_ws/misc/speed_control/include/**",
-				"/usr/include/**"
+				"/usr/include/**",
+				"/usr/local/include/**",
+				"${workspaceFolder}/src/**"
 			],
 			"name": "ros2",
 			"intelliSenseMode": "gcc-x64",

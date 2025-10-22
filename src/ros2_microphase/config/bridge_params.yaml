@@ -1,0 +1,31 @@
+/**:
+  ros__parameters:
+    # SocketCAN interface name (virtual CAN interface)
+    socketcan_interface: "vcan0"
+    
+    # USB device path for Waveshare adapter
+    usb_device: "/dev/ttyUSB0"
+    
+    # Serial baud rate (2Mbps recommended for USB-CAN-A)
+    # Options: 115200, 500000, 1000000, 2000000
+    serial_baud: 2000000
+    
+    # CAN bus baud rate (must match your motor driver settings)
+    # Options: 100000, 125000, 250000, 500000, 1000000
+    can_baud: 1000000
+    
+    # CAN mode
+    # 0 = NORMAL, 1 = LOOPBACK, 2 = SILENT, 3 = LOOPBACK_SILENT
+    can_mode: normal
+    
+    # Auto retransmit on error
+    auto_retransmit: true
+    
+    # Timeout for reading from USB adapter (milliseconds)
+    usb_read_timeout_ms: 1000
+    
+    # Timeout for reading from SocketCAN interface (milliseconds)
+    socketcan_read_timeout_ms: 1000
+    
+    # Diagnostics publishing rate (Hz)
+    diagnostics_rate: 1.0

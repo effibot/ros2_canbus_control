@@ -11,17 +11,12 @@
 		"vscode": {
 			"extensions": [
 				"AykutSarac.jsoncrack-vscode",
-				"KevinRose.vsc-python-indent",
 				"MermaidChart.vscode-mermaid-chart",
 				"Ranch-Hand-Robotics.rde-pack",
 				"Upstash.context7-mcp",
 				"betwo.b2-catkin-tools",
-				"betwo.vscode-doxygen-runner",
-				"bbenoist.Doxygen",
 				"cschlosser.doxdocgen",
-				"eamodio.gitlens",
 				"edwinhuish.better-comments-next",
-				"foxundermoon.shell-format",
 				"janisdd.vscode-edit-csv",
 				"mechatroner.rainbow-csv",
 				"mgesbert.python-path",
@@ -31,7 +26,6 @@
 				"ms-python.pylint",
 				"ms-python.python",
 				"ms-vscode.cmake-tools",
-				"ms-vscode.copilot-mermaid-diagram",
 				"ms-vscode.cpptools",
 				"mtsmfm.vscode-stl-viewer",
 				"njpwerner.autodocstring",
@@ -39,11 +33,8 @@
 				"redhat.vscode-xml",
 				"redhat.vscode-yaml",
 				"rodolphebarbanneau.python-docstring-highlighter",
-				"shardulm94.trailing-spaces",
 				"smilerobotics.urdf",
 				"streetsidesoftware.code-spell-checker",
-				"timonwong.shellcheck",
-				"zachflower.uncrustify",
 				"matepek.vscode-catch2-test-adapter",
 				"Guyutongxue.cpp-reference",
 				"littlefoxteam.vscode-python-test-adapter",
@@ -52,7 +43,11 @@
 				"tdennis4496.cmantic",
 				"usernamehw.errorlens",
 				"yzhang.markdown-all-in-one",
-				"shd101wyy.markdown-preview-enhanced"
+				"trunk.io",
+				"mhutchie.git-graph",
+				"codezombiech.gitignore",
+				"Gruntfuggly.todo-tree",
+				"mads-hartmann.bash-ide-vscode"
 			],
 			"settings": {
 				"python.defaultInterpreterPath": "/usr/bin/python3",
@@ -71,7 +66,7 @@
 					"*.urdf": "xml",
 					"*.sdf": "xml"
 				},
-				"terminal.integrated.shell.linux": "/bin/bash",
+				"terminal.integrated.shell.linux": "/bin/zsh",
 				"ros.distro": "jazzy"
 			}
 		}
