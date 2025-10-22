@@ -1,0 +1,3 @@
+[submodule "src/ros2_microphase/lib/waveshare_cpp"]
+	path = src/ros2_microphase/lib/waveshare_cpp
+	url = https://github.com/effibot/waveshare_cpp
