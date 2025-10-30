@@ -3,17 +3,15 @@
 
 namespace ros2_microphase {
 
-    CanopenLifeCycleNode::CanopenLifeCycleNode(
-        const rclcpp::NodeOptions& options)
-        : LifecycleNode("waveshare_bridge", options)
-        , diag_updater_(this) {
+    CanopenLifeCycleNode::CanopenLifeCycleNode(const rclcpp::NodeOptions& options)
+        : LifecycleNode("waveshare_bridge", options), diag_updater_(this) {
         RCLCPP_INFO(get_logger(), "CANopen Lifecycle Node created");
 
         // Declare parameters with defaults
         declare_parameter<std::string>("socketcan_interface", "vcan0");
         declare_parameter<std::string>("usb_device", "/dev/ttyUSB0");
         declare_parameter<int>("serial_baud", 2000000); // 2Mbps
-        declare_parameter<int>("can_baud", 1000000); // 1Mbps
+        declare_parameter<int>("can_baud", 1000000);    // 1Mbps
         declare_parameter<bool>("auto_retransmit", true);
         declare_parameter<std::string>("can_mode", "normal"); // NORMAL
         declare_parameter<int>("usb_read_timeout_ms", 1000);
@@ -24,19 +22,22 @@ namespace ros2_microphase {
     CanopenLifeCycleNode::~CanopenLifeCycleNode() {
         // Stop bridge if still running
         if (socketcan_bridge_) {
-            try {
+            try
+            {
                 socketcan_bridge_->stop();
-            } catch (const std::exception& e) {
+            }
+            catch (const std::exception& e) {
                 RCLCPP_ERROR(get_logger(), "Error stopping bridge in destructor: %s", e.what());
             }
         }
     }
 
-    LifecycleNodeInterface::CallbackReturn CanopenLifeCycleNode::on_configure(
-        const rclcpp_lifecycle::State& /*previous_state*/) {
+    LifecycleNodeInterface::CallbackReturn
+    CanopenLifeCycleNode::on_configure(const rclcpp_lifecycle::State& /*previous_state*/) {
         RCLCPP_INFO(get_logger(), "Configuring...");
 
-        try {
+        try
+        {
             // Create bridge configuration from parameters
             bridge_config_ = std::make_shared<BridgeConfig>();
 
@@ -78,29 +79,30 @@ namespace ros2_microphase {
             RCLCPP_INFO(get_logger(), "  CAN Baud: %d", can_baud);
 
             return LifecycleNodeInterface::CallbackReturn::SUCCESS;
-
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             RCLCPP_ERROR(get_logger(), "Configuration failed: %s", e.what());
             return LifecycleNodeInterface::CallbackReturn::FAILURE;
         }
     }
 
-    LifecycleNodeInterface::CallbackReturn CanopenLifeCycleNode::on_activate(
-        const rclcpp_lifecycle::State& /*previous_state*/) {
+    LifecycleNodeInterface::CallbackReturn
+    CanopenLifeCycleNode::on_activate(const rclcpp_lifecycle::State& /*previous_state*/) {
         RCLCPP_INFO(get_logger(), "Activating...");
 
-        try {
+        try
+        {
             // Create bridge using factory (automatically creates vcan, opens sockets, configures USB)
             socketcan_bridge_ = SocketCANBridge::create(*bridge_config_);
 
             // Register callbacks for monitoring
-            socketcan_bridge_->set_usb_to_socketcan_callback(
-                std::bind(&CanopenLifeCycleNode::usb_to_socketcan_callback_impl, this,
-                std::placeholders::_1, std::placeholders::_2));
+            socketcan_bridge_->set_usb_to_socketcan_callback(std::bind(
+                &CanopenLifeCycleNode::usb_to_socketcan_callback_impl,
+                this, std::placeholders::_1, std::placeholders::_2));
 
-            socketcan_bridge_->set_socketcan_to_usb_callback(
-                std::bind(&CanopenLifeCycleNode::socketcan_to_usb_callback_impl, this,
-                std::placeholders::_1, std::placeholders::_2));
+            socketcan_bridge_->set_socketcan_to_usb_callback(std::bind(
+                &CanopenLifeCycleNode::socketcan_to_usb_callback_impl,
+                this, std::placeholders::_1, std::placeholders::_2));
 
             // Start bridge forwarding threads
             socketcan_bridge_->start();
@@ -115,39 +117,42 @@ namespace ros2_microphase {
                 socketcan_bridge_->is_socketcan_open() ? "OPEN" : "CLOSED");
 
             return LifecycleNodeInterface::CallbackReturn::SUCCESS;
-
-        } catch (const std::exception& e) {
+        }
+        catch (const std::exception& e) {
             RCLCPP_ERROR(get_logger(), "Activation failed: %s", e.what());
             socketcan_bridge_.reset();
             return LifecycleNodeInterface::CallbackReturn::FAILURE;
         }
     }
 
-    LifecycleNodeInterface::CallbackReturn CanopenLifeCycleNode::on_deactivate(
-        const rclcpp_lifecycle::State& /*previous_state*/) {
+    LifecycleNodeInterface::CallbackReturn
+    CanopenLifeCycleNode::on_deactivate(const rclcpp_lifecycle::State& /*previous_state*/) {
         RCLCPP_INFO(get_logger(), "Deactivating...");
 
         if (socketcan_bridge_) {
-            try {
+            try
+            {
                 // Stop bridge threads (destructor will close sockets)
                 socketcan_bridge_->stop();
 
                 // Log final statistics
                 auto stats = socketcan_bridge_->get_statistics();
                 RCLCPP_INFO(get_logger(), "Final Statistics:");
-                RCLCPP_INFO(get_logger(), "  USB RX: %lu frames (%lu errors)",
-                    stats.usb_rx_frames, stats.usb_rx_errors);
-                RCLCPP_INFO(get_logger(), "  USB TX: %lu frames (%lu errors)",
-                    stats.usb_tx_frames, stats.usb_tx_errors);
+                RCLCPP_INFO(get_logger(), "  USB RX: %lu frames (%lu errors)", stats.usb_rx_frames,
+                    stats.usb_rx_errors);
+                RCLCPP_INFO(get_logger(), "  USB TX: %lu frames (%lu errors)", stats.usb_tx_frames,
+                    stats.usb_tx_errors);
                 RCLCPP_INFO(get_logger(), "  CAN RX: %lu frames (%lu errors)",
-                    stats.socketcan_rx_frames, stats.socketcan_rx_errors);
+                    stats.socketcan_rx_frames,
+                    stats.socketcan_rx_errors);
                 RCLCPP_INFO(get_logger(), "  CAN TX: %lu frames (%lu errors)",
-                    stats.socketcan_tx_frames, stats.socketcan_tx_errors);
+                    stats.socketcan_tx_frames,
+                    stats.socketcan_tx_errors);
                 RCLCPP_INFO(get_logger(), "  Conversion errors: %lu", stats.conversion_errors);
 
                 socketcan_bridge_.reset();
-
-            } catch (const std::exception& e) {
+            }
+            catch (const std::exception& e) {
                 RCLCPP_ERROR(get_logger(), "Error during deactivation: %s", e.what());
             }
         }
@@ -159,8 +164,8 @@ namespace ros2_microphase {
         return LifecycleNodeInterface::CallbackReturn::SUCCESS;
     }
 
-    LifecycleNodeInterface::CallbackReturn CanopenLifeCycleNode::on_cleanup(
-        const rclcpp_lifecycle::State& /*previous_state*/) {
+    LifecycleNodeInterface::CallbackReturn
+    CanopenLifeCycleNode::on_cleanup(const rclcpp_lifecycle::State& /*previous_state*/) {
         RCLCPP_INFO(get_logger(), "Cleaning up...");
 
         // Reset configuration
@@ -170,14 +175,16 @@ namespace ros2_microphase {
         return LifecycleNodeInterface::CallbackReturn::SUCCESS;
     }
 
-    LifecycleNodeInterface::CallbackReturn CanopenLifeCycleNode::on_shutdown(
-        const rclcpp_lifecycle::State& /*previous_state*/) {
+    LifecycleNodeInterface::CallbackReturn
+    CanopenLifeCycleNode::on_shutdown(const rclcpp_lifecycle::State& /*previous_state*/) {
         RCLCPP_INFO(get_logger(), "Shutting down...");
 
         if (socketcan_bridge_) {
-            try {
+            try
+            {
                 socketcan_bridge_->stop();
-            } catch (const std::exception& e) {
+            }
+            catch (const std::exception& e) {
                 RCLCPP_ERROR(get_logger(), "Error during shutdown: %s", e.what());
             }
             socketcan_bridge_.reset();
@@ -192,8 +199,7 @@ namespace ros2_microphase {
     void CanopenLifeCycleNode::setup_diagnostics() {
         // Setup diagnostic updater
         diag_updater_.setHardwareID("Waveshare USB-CAN-A");
-        diag_updater_.add("Bridge Status", this,
-            &CanopenLifeCycleNode::bridge_diagnostic_callback);
+        diag_updater_.add("Bridge Status", this, &CanopenLifeCycleNode::bridge_diagnostic_callback);
 
         // Set update frequency
         double rate = get_parameter("diagnostics_rate").as_double();
@@ -206,8 +212,7 @@ namespace ros2_microphase {
     void CanopenLifeCycleNode::bridge_diagnostic_callback(
         diagnostic_updater::DiagnosticStatusWrapper& stat) {
         if (!socketcan_bridge_) {
-            stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR,
-                "Bridge not initialized");
+            stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Bridge not initialized");
             return;
         }
 
@@ -222,11 +227,12 @@ namespace ros2_microphase {
         // Determine health status
         if (running && usb_open && can_open) {
             // Calculate error rate
-            uint64_t total_frames = stats.usb_rx_frames + stats.usb_tx_frames +
-                stats.socketcan_rx_frames + stats.socketcan_tx_frames;
+            uint64_t total_frames =
+                stats.usb_rx_frames + stats.usb_tx_frames + stats.socketcan_rx_frames +
+                stats.socketcan_tx_frames;
             uint64_t total_errors = stats.usb_rx_errors + stats.usb_tx_errors +
-                stats.socketcan_rx_errors + stats.socketcan_tx_errors +
-                stats.conversion_errors;
+                stats.socketcan_rx_errors +
+                stats.socketcan_tx_errors + stats.conversion_errors;
 
             if (total_frames > 0) {
                 double error_rate = static_cast<double>(total_errors) /
@@ -236,22 +242,18 @@ namespace ros2_microphase {
                     stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN,
                         "High error rate detected");
                 } else {
-                    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK,
-                        "Bridge operational");
+                    stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Bridge operational");
                 }
             } else {
                 stat.summary(diagnostic_msgs::msg::DiagnosticStatus::OK,
                     "Bridge operational (no traffic)");
             }
         } else if (!running) {
-            stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR,
-                "Bridge not running");
+            stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Bridge not running");
         } else if (!usb_open && !can_open) {
-            stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR,
-                "Both interfaces down");
+            stat.summary(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Both interfaces down");
         } else {
-            stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN,
-                "One interface down");
+            stat.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "One interface down");
         }
 
         // Add detailed status
@@ -273,43 +275,44 @@ namespace ros2_microphase {
         stat.add("Conversion Errors", stats.conversion_errors);
 
         // Add calculated metrics
-        uint64_t total_frames = stats.usb_rx_frames + stats.usb_tx_frames +
-            stats.socketcan_rx_frames + stats.socketcan_tx_frames;
+        uint64_t total_frames =
+            stats.usb_rx_frames + stats.usb_tx_frames + stats.socketcan_rx_frames +
+            stats.socketcan_tx_frames;
         stat.add("Total Frames", total_frames);
 
         if (total_frames > 0) {
             uint64_t total_errors = stats.usb_rx_errors + stats.usb_tx_errors +
-                stats.socketcan_rx_errors + stats.socketcan_tx_errors +
-                stats.conversion_errors;
+                stats.socketcan_rx_errors +
+                stats.socketcan_tx_errors + stats.conversion_errors;
             double error_rate = (static_cast<double>(total_errors) /
                 static_cast<double>(total_frames)) * 100.0;
             stat.add("Error Rate (%)", error_rate);
         }
     }
 
-    void CanopenLifeCycleNode::usb_to_socketcan_callback_impl(
-        const VariableFrame& usb_frame,
+    void CanopenLifeCycleNode::usb_to_socketcan_callback_impl(const VariableFrame& usb_frame,
         const ::can_frame& socketcan_frame) {
         // Optional: Custom logging at DEBUG level
         RCLCPP_DEBUG(get_logger(), "USB=>CAN: ID=0x%03X, DLC=%d",
-            socketcan_frame.can_id & CAN_EFF_MASK, socketcan_frame.can_dlc);
+            socketcan_frame.can_id & CAN_EFF_MASK,
+            socketcan_frame.can_dlc);
 
         // Update diagnostics
         diag_updater_.force_update();
     }
 
-    void CanopenLifeCycleNode::socketcan_to_usb_callback_impl(
-        const ::can_frame& socketcan_frame,
+    void CanopenLifeCycleNode::socketcan_to_usb_callback_impl(const ::can_frame& socketcan_frame,
         const VariableFrame& usb_frame) {
         // Optional: Custom logging at DEBUG level
         RCLCPP_DEBUG(get_logger(), "CAN=>USB: ID=0x%03X, DLC=%d",
-            socketcan_frame.can_id & CAN_EFF_MASK, socketcan_frame.can_dlc);
+            socketcan_frame.can_id & CAN_EFF_MASK,
+            socketcan_frame.can_dlc);
 
         // Update diagnostics
         diag_updater_.force_update();
     }
 
-}  // namespace ros2_microphase
+} // namespace ros2_microphase
 
 #include "rclcpp_components/register_node_macro.hpp"
 RCLCPP_COMPONENTS_REGISTER_NODE(ros2_microphase::CanopenLifeCycleNode)

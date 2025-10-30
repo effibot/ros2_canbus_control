@@ -1,0 +1,769 @@
+#! /bin/bash
+
+# =============================================================================
+# ROS Workspace Management Functions
+# =============================================================================
+# This file contains enhanced bash functions for managing ROS workspaces with
+# improved status monitoring, colored output, and error handling.
+#
+# Main Functions:
+# - ros_clean: Clean build files with detailed progress
+# - ros_source: Source workspace with environment validation
+# - ros_build: Build workspace with real-time compilation status
+# - ros_update: Update dependencies and rebuild
+# - ros_search: Search for ROS packages with installation status
+# - ros_list: List workspace packages with build status
+# - ros_build_pkg: Build specific packages quickly
+# - ros_status: Show comprehensive workspace overview
+#
+# Usage: Source this file in your ~/.bashrc or ~/.funcrc
+# =============================================================================
+
+# Colored output for better visibility
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Function to print messages in yellow
+print_info() {
+    echo -e "${YELLOW}[INFO]${NC} $1"
+}
+
+# Function to print messages in green
+print_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+# Function to print messages in red
+print_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# Function to print warnings in magenta
+print_warning() {
+    echo -e "${MAGENTA}[WARNING]${NC} $1"
+}
+
+# Function to print progress in cyan
+print_progress() {
+    echo -e "${CYAN}[PROGRESS]${NC} $1"
+}
+
+# Function to print step information in blue
+print_step() {
+    echo -e "${BLUE}[STEP]${NC} $1"
+}
+
+# Function to print a line with checkmark (green)
+print_check() {
+    echo -e "  ${GREEN}✓${NC} $1"
+}
+
+# Function to print a line with warning circle (yellow)
+print_circle() {
+    echo -e "  ${YELLOW}○${NC} $1"
+}
+
+# Function to print a line with X mark (red)
+print_cross() {
+    echo -e "  ${RED}✗${NC} $1"
+}
+
+# Function to print table headers
+print_table_header() {
+    echo ""
+    echo -e "$1"
+    echo -e "$2"
+}
+
+# Function to print table row with checkmark (green)
+print_table_row_check() {
+    echo -e "${GREEN}✓\t${NC}$1"
+}
+
+# Function to print table row without checkmark
+print_table_row() {
+    echo -e " \t$1"
+}
+
+# Function to print aligned table row with checkmark (green)
+print_aligned_row_check() {
+    local col1="$1"
+    local col2="$2"
+    printf "${GREEN}✓\t${NC}%-45s\t%s\n" "$col1" "$col2"
+}
+
+# Function to print aligned table row without checkmark
+print_aligned_row() {
+    local col1="$1"
+    local col2="$2"
+    printf " \t%-45s\t%s\n" "$col1" "$col2"
+}
+
+# Function to print aligned 3-column table row with checkmark (green)
+print_aligned_3col_check() {
+    local col1="$1"
+    local col2="$2"
+    local col3="$3"
+    printf "${GREEN}✓\t${NC}%-30s\t%-15s\t%s\n" "$col1" "$col2" "$col3"
+}
+
+# Function to print aligned 3-column table row without checkmark
+print_aligned_3col() {
+    local col1="$1"
+    local col2="$2"
+    local col3="$3"
+    printf " \t%-30s\t%-15s\t%s\n" "$col1" "$col2" "$col3"
+}
+
+# =============================================================================
+# UTILITY FUNCTIONS - Common functionality used by multiple ROS functions
+# =============================================================================
+
+# Validate workspace and navigate to it
+# Returns: 0 on success, 1 on failure
+validate_workspace() {
+    # Check if ROS_WORKSPACE is set
+    if [ -z "$ROS_WORKSPACE" ]; then
+        print_error "ROS_WORKSPACE environment variable not set!"
+        return 1
+    fi
+
+    # Check if workspace directory exists
+    if [ ! -d "$ROS_WORKSPACE" ]; then
+        print_error "ROS workspace directory '$ROS_WORKSPACE' not found!"
+        return 1
+    fi
+
+    return 0
+}
+
+# Find all packages in the workspace
+# Sets global variable: WORKSPACE_PACKAGES (array of package directories)
+find_workspace_packages() {
+    if [ ! -d "src" ]; then
+        print_error "No 'src' directory found in workspace!"
+        return 1
+    fi
+
+    local packages
+    packages=$(find src -name "package.xml" -exec dirname {} \; 2>/dev/null | sort)
+
+    if [ -z "$packages" ]; then
+        return 1 # No packages found
+    fi
+
+    # Store in global variable for reuse
+    WORKSPACE_PACKAGES="$packages"
+    return 0
+}
+
+# Check if a package is built
+# Args: $1 = package_name
+# Returns: 0 if built, 1 if not built
+check_package_built() {
+    local pkg_name="$1"
+    [ -d "install/$pkg_name" ] || [ -d "devel/lib/$pkg_name" ]
+}
+
+# Get package info from package.xml
+# Args: $1 = package_directory
+# Sets global variables: PKG_VERSION, PKG_DESCRIPTION
+get_package_info() {
+    local pkg_dir="$1"
+
+    if [ -f "$pkg_dir/package.xml" ]; then
+        PKG_VERSION=$(grep -o '<version>[^<]*</version>' "$pkg_dir/package.xml" 2>/dev/null | sed 's/<[^>]*>//g' | head -1)
+        PKG_DESCRIPTION=$(grep -o '<description>[^<]*</description>' "$pkg_dir/package.xml" 2>/dev/null | sed 's/<[^>]*>//g' | head -1)
+        [ -z "$PKG_VERSION" ] && PKG_VERSION="unknown"
+        [ -z "$PKG_DESCRIPTION" ] && PKG_DESCRIPTION="No description available"
+    else
+        PKG_VERSION="unknown"
+        PKG_DESCRIPTION="No package.xml found"
+    fi
+}
+
+# Create and manage temporary files with cleanup
+# Returns: path to temporary file
+create_temp_file() {
+    local temp_file
+    temp_file=$(mktemp)
+    # Store in array for cleanup
+    TEMP_FILES+=("$temp_file")
+    echo "$temp_file"
+}
+
+# Clean up all temporary files
+cleanup_temp_files() {
+    if [ ${#TEMP_FILES[@]} -gt 0 ]; then
+        rm -f "${TEMP_FILES[@]}"
+        TEMP_FILES=()
+    fi
+}
+
+# =============================================================================
+# MAIN ROS FUNCTIONS
+# =============================================================================
+
+# Function to clean ROS build files
+ros_clean() {
+    print_info "Starting ROS workspace cleanup..."
+
+    # Validate workspace
+    validate_workspace || return 1
+
+    pushd "$(pwd)" >/dev/null || return 1
+    cd "$ROS_WORKSPACE" || {
+        print_error "Failed to navigate to ROS workspace!"
+        return 1
+    }
+
+    # Show current directory size before cleanup
+    local initial_size
+    initial_size=$(du -sh . 2>/dev/null | cut -f1)
+    print_step "Current workspace size: $initial_size"
+
+    # Count directories to be removed
+    local dirs_to_remove=()
+    [ -d "build" ] && dirs_to_remove+=("build")
+    [ -d "devel" ] && dirs_to_remove+=("devel")
+    [ -d "install" ] && dirs_to_remove+=("install")
+    [ -d "log" ] && dirs_to_remove+=("log")
+
+    if [ ${#dirs_to_remove[@]} -eq 0 ]; then
+        print_warning "No build directories found to clean."
+        popd >/dev/null || return 1
+        return 0
+    fi
+
+    print_step "Removing directories: ${dirs_to_remove[*]}"
+
+    # Remove directories with progress indication
+    for dir in "${dirs_to_remove[@]}"; do
+        if [ -d "$dir" ]; then
+            print_progress "Removing $dir..."
+            if rm -rf "$dir"; then
+                print_success "✓ Removed $dir"
+            else
+                print_error "✗ Failed to remove $dir"
+            fi
+        fi
+    done
+
+    # Show final directory size
+    local final_size
+    final_size=$(du -sh . 2>/dev/null | cut -f1)
+    print_step "Workspace size after cleanup: $final_size"
+
+    print_success "ROS workspace cleanup completed successfully."
+    popd >/dev/null || return 1
+}
+
+# Function to source ROS workspace
+ros_source() {
+    print_info "Sourcing ROS workspace environment..."
+
+    # Validate workspace
+    validate_workspace || return 1
+
+    # Check for install/setup.bash first (colcon)
+    if [ -f "$ROS_WORKSPACE/install/setup.bash" ]; then
+        print_step "Found colcon workspace setup file"
+        # shellcheck disable=SC1090
+        # shellcheck disable=SC1091
+        . "$ROS_WORKSPACE/install/setup.bash"
+        print_success "✓ Colcon workspace sourced successfully"
+
+        # Show some environment info
+        if command -v ros2 >/dev/null 2>&1; then
+            local ros_distro
+            ros_distro=$(ros2 --version 2>/dev/null | grep -oE 'ros2.*' | head -1)
+            print_step "Active ROS distribution: $ros_distro"
+        fi
+
+        # Show workspace packages if any
+        if [ -d "$ROS_WORKSPACE/install" ]; then
+            local pkg_count
+            pkg_count=$(find "$ROS_WORKSPACE/install" -maxdepth 1 -type d ! -name "install" | wc -l)
+            if [ "$pkg_count" -gt 0 ]; then
+                print_step "Workspace contains $pkg_count packages"
+            fi
+        fi
+
+    # Check for devel/setup.bash (catkin)
+    elif [ -f "$ROS_WORKSPACE/devel/setup.bash" ]; then
+        print_step "Found catkin workspace setup file"
+        # shellcheck disable=SC1090
+        # shellcheck disable=SC1091
+        . "$ROS_WORKSPACE/devel/setup.bash"
+        print_success "✓ Catkin workspace sourced successfully"
+
+    else
+        print_error "No setup.bash found in workspace!"
+        print_info "Please build the workspace first using 'ros_build'"
+        return 1
+    fi
+}
+
+# Function to build ROS workspace with enhanced status monitoring
+# Usage: ros_build [packages_to_skip] [packages_to_select] [build_type]
+# - packages_to_skip: space-separated list of packages to skip (optional)
+# - packages_to_select: space-separated list of packages to build (optional)
+# - build_type: Debug|Release|RelWithDebInfo (default: Debug)
+ros_build() {
+    print_info "Starting ROS workspace build process..."
+
+    # Validate workspace and navigate to it
+    validate_workspace || return 1
+
+    pushd "$(pwd)" >/dev/null || return 1
+    cd "$ROS_WORKSPACE" || {
+        print_error "Failed to navigate to ROS workspace!"
+        return 1
+    }
+
+    # Check if src directory exists
+    if [ ! -d "src" ]; then
+        print_error "No 'src' directory found in workspace!"
+        popd >/dev/null || return 1
+        return 1
+    fi
+
+    # Parse arguments
+    local packages_skip="$1"
+    local packages_select="$2"
+    local build_type="${3:-Debug}"
+
+    # Validate build type
+    case "$build_type" in
+    Debug | Release | RelWithDebInfo | MinSizeRel) ;;
+    *)
+        print_warning "Invalid build type '$build_type', using Debug"
+        build_type="Debug"
+        ;;
+    esac
+
+    # Count packages in workspace
+    local total_packages
+    total_packages=$(find src -name "package.xml" | wc -l)
+    print_step "Found $total_packages packages in workspace"
+
+    # Show build configuration
+    print_step "Build configuration:"
+    echo "  Build type: $build_type"
+    echo "  Parallel workers: $(nproc)"
+    [ -n "$packages_skip" ] && echo "  Skipping packages: $packages_skip"
+    [ -n "$packages_select" ] && echo "  Selected packages: $packages_select"
+
+    # Initialize temp files array
+    TEMP_FILES=()
+
+    # Build the colcon command
+    local build_cmd
+    build_cmd="colcon build --symlink-install --cmake-args=-DCMAKE_BUILD_TYPE=$build_type --parallel-workers $(nproc)"
+    [ -n "$packages_skip" ] && build_cmd="$build_cmd --packages-skip $packages_skip"
+    [ -n "$packages_select" ] && build_cmd="$build_cmd --packages-select $packages_select"
+
+    # Add event handlers for better output
+    build_cmd="$build_cmd --event-handlers console_direct+"
+
+    print_step "Executing build command..."
+    print_progress "Command: $build_cmd"
+    echo ""
+
+    # Execute build and analyze results
+    local build_exit_code
+    if _execute_build "$build_cmd"; then
+        build_exit_code=0
+    else
+        build_exit_code=1
+    fi
+
+    # Clean up temporary files
+    cleanup_temp_files
+
+    # Source workspace if build was successful
+    if [ "$build_exit_code" -eq 0 ]; then
+        print_step "Sourcing updated workspace..."
+        ros_source
+    fi
+
+    popd >/dev/null || return 1
+    return "$build_exit_code"
+}
+
+# Helper function to execute build and analyze results
+_execute_build() {
+    local build_cmd="$1"
+
+    # Record start time
+    local start_time
+    start_time=$(date +%s)
+
+    # Execute the build command and capture output
+    local build_log
+    build_log=$(create_temp_file)
+
+    # Run the build with tee to show output and capture it
+    eval "$build_cmd" 2>&1 | tee "$build_log"
+    local build_exit_code=${PIPESTATUS[0]}
+
+    # Calculate build time
+    local end_time
+    end_time=$(date +%s)
+    local build_duration=$((end_time - start_time))
+    local build_time_formatted
+    build_time_formatted=$(printf "%d:%02d" $((build_duration / 60)) $((build_duration % 60)))
+
+    echo ""
+    print_step "Build completed in $build_time_formatted"
+
+    # Analyze build results
+    if [ "$build_exit_code" -eq 0 ]; then
+        print_success "✓ All packages built successfully!"
+
+        # Count successful builds
+        local success_count
+        success_count=$(grep -c "Finished.*packages.*\[.*s\]" "$build_log" 2>/dev/null || echo "0")
+        if [ "$success_count" -gt 0 ]; then
+            print_step "Successfully built $success_count packages"
+        fi
+
+        # Show warnings if any
+        local warning_count
+        warning_count=$(grep -c "warning:" "$build_log" 2>/dev/null || echo "0")
+        if [ "$warning_count" -gt 0 ]; then
+            print_warning "Build completed with $warning_count warnings"
+        fi
+
+        return 0
+    else
+        print_error "✗ Build failed!"
+
+        # Show error summary
+        echo ""
+        print_step "Error summary:"
+        grep -E "(FAILED|ERROR|error:|fatal error:)" "$build_log" | tail -10
+
+        # Show which packages failed
+        local failed_packages
+        failed_packages=$(grep "Failed.*packages.*" "$build_log" | tail -1)
+        if [ -n "$failed_packages" ]; then
+            print_error "$failed_packages"
+        fi
+
+        return 1
+    fi
+}
+
+# Update ROS workspace dependencies and rebuild
+ros_update() {
+    print_info "Starting ROS workspace dependency update and rebuild..."
+
+    # Validate workspace and navigate to it
+    validate_workspace || return 1
+
+    pushd "$(pwd)" >/dev/null || return 1
+    cd "$ROS_WORKSPACE" || {
+        print_error "ROS workspace not found!"
+        return 1
+    }
+
+    # Check if src directory exists
+    if [ ! -d "src" ]; then
+        print_error "No 'src' directory found in workspace!"
+        popd >/dev/null || return 1
+        return 1
+    fi
+
+    # Initialize temp files array
+    TEMP_FILES=()
+
+    # Step 1: Update rosdep database
+    print_step "Updating rosdep database..."
+    if rosdep update >/dev/null 2>&1; then
+        print_success "✓ Rosdep database updated"
+    else
+        print_warning "⚠ Failed to update rosdep database (continuing anyway)"
+    fi
+
+    # Step 2: Check for missing dependencies
+    print_step "Analyzing package dependencies..."
+    local deps_output
+    deps_output=$(create_temp_file)
+
+    # Run rosdep check to see what's missing
+    if rosdep check --from-paths src --ignore-src 2>&1 | tee "$deps_output"; then
+        print_success "✓ All dependencies are satisfied"
+    else
+        print_step "Installing missing dependencies..."
+
+        # Install missing dependencies
+        if rosdep install --from-paths src --ignore-src -r -y; then
+            print_success "✓ Dependencies installed successfully"
+        else
+            print_error "✗ Failed to install some dependencies"
+            print_warning "Build may fail due to missing dependencies"
+        fi
+    fi
+
+    # Step 3: Clean previous build (optional, ask user)
+    echo ""
+    read -p "Do you want to clean previous build files? [y/N]: " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        print_step "Cleaning previous build files..."
+        ros_clean
+    fi
+
+    # Step 4: Rebuild workspace
+    print_step "Rebuilding workspace..."
+    ros_build "" "" "Release"
+
+    local build_status=$?
+
+    # Clean up temporary files
+    cleanup_temp_files
+
+    if [ $build_status -eq 0 ]; then
+        print_success "✓ Workspace update and rebuild completed successfully"
+    else
+        print_error "✗ Workspace rebuild failed"
+        popd >/dev/null || return 1
+        return $build_status
+    fi
+
+    popd >/dev/null || return 1
+}
+
+# Search for ROS packages in apt
+ros_search() {
+    if [ -z "$1" ]; then
+        print_error "Please provide a search term."
+        return 1
+    fi
+
+    local search_term="$1"
+    local ros_distro
+    ros_distro=$(rosversion -d 2>/dev/null || echo "jazzy")
+
+    print_info "Searching for ROS packages matching '$search_term'..."
+
+    # Initialize temp files array
+    TEMP_FILES=()
+
+    # Get list of installed packages for quick lookup
+    local installed_pkgs
+    installed_pkgs=$(dpkg -l | grep "^ii" | awk '{print $2}' | grep "^ros-$ros_distro" | sort)
+
+    # Create temporary file for processing
+    local temp_search
+    temp_search=$(create_temp_file)
+
+    # Search for packages and format results
+    apt-cache search "ros-$ros_distro-$search_term" >"$temp_search"
+
+    # Process results if any found
+    if [ -s "$temp_search" ]; then
+        # Print table header
+        print_table_header "INST\tPACKAGE NAME\t\t\t\t\tDESCRIPTION" \
+            "----\t---------------------------------------------\t--------------------------------------------------"
+
+        # Process each package
+        while IFS= read -r line; do
+            if [ -n "$line" ]; then
+                local pkg_name
+                pkg_name=$(echo "$line" | cut -d' ' -f1)
+                local description
+                description=$(echo "$line" | cut -d' ' -f2- | sed 's/^ *//')
+
+                # Check if package is installed and format output
+                if echo "$installed_pkgs" | grep -q "^$pkg_name$"; then
+                    # Installed package - show with green checkmark
+                    print_aligned_row_check "$pkg_name" "$description"
+                else
+                    # Not installed - show normally
+                    print_aligned_row "$pkg_name" "$description"
+                fi
+            fi
+        done <"$temp_search" | sort -k2
+        echo ""
+    else
+        print_error "No packages found matching '$search_term'"
+    fi
+
+    # Clean up temporary files
+    cleanup_temp_files
+}
+
+# Function to list all packages in the workspace
+ros_list() {
+    print_info "Listing ROS workspace packages..."
+
+    # Validate workspace and navigate to it
+    validate_workspace || return 1
+
+    pushd "$ROS_WORKSPACE" >/dev/null || return 1
+
+    # Find packages using utility function
+    if ! find_workspace_packages; then
+        print_warning "No packages found in workspace"
+        popd >/dev/null || return 1
+        return 0
+    fi
+
+    print_table_header "STAT\tPACKAGE NAME\t\t\tVERSION\t\tDESCRIPTION" \
+        "----\t------------------------------\t---------------\t----------------------------------------"
+
+    # Process each package using utility functions
+    while IFS= read -r pkg_dir; do
+        if [ -n "$pkg_dir" ]; then
+            local pkg_name
+            pkg_name=$(basename "$pkg_dir")
+
+            # Get package info using utility function
+            get_package_info "$pkg_dir"
+
+            # Print with proper coloring and alignment
+            if check_package_built "$pkg_name"; then
+                print_aligned_3col_check "$pkg_name" "$PKG_VERSION" "$PKG_DESCRIPTION"
+            else
+                print_aligned_3col "$pkg_name" "$PKG_VERSION" "$PKG_DESCRIPTION"
+            fi
+        fi
+    done <<<"$WORKSPACE_PACKAGES"
+
+    echo ""
+    local total_packages
+    total_packages=$(echo "$WORKSPACE_PACKAGES" | wc -l)
+    print_step "Total packages: $total_packages"
+
+    popd >/dev/null || return 1
+}
+
+# Function to build specific packages quickly
+ros_build_pkg() {
+    if [ -z "$1" ]; then
+        print_error "Please provide package name(s) to build."
+        print_info "Usage: ros_build_pkg <package1> [package2] [package3] ..."
+        return 1
+    fi
+
+    local packages="$*"
+    print_info "Building specific packages: $packages"
+
+    # Use the enhanced ros_build function with package selection
+    ros_build "" "$packages" "Debug"
+}
+
+# Function to show workspace status overview
+ros_status() {
+    print_info "ROS Workspace Status Overview"
+
+    # Validate workspace
+    validate_workspace || return 1
+
+    echo ""
+    print_step "Workspace: $ROS_WORKSPACE"
+
+    pushd "$ROS_WORKSPACE" >/dev/null || return 1
+
+    # Check workspace structure
+    local has_src=false
+    local has_build=false
+    local has_install=false
+    local has_devel=false
+
+    [ -d "src" ] && has_src=true
+    [ -d "build" ] && has_build=true
+    [ -d "install" ] && has_install=true
+    [ -d "devel" ] && has_devel=true
+
+    echo ""
+    print_step "Workspace Structure:"
+    if $has_src; then
+        print_check "src directory"
+    else
+        print_cross "src directory"
+    fi
+
+    if $has_build; then
+        print_check "build directory"
+    else
+        print_circle "build directory (not built yet)"
+    fi
+
+    if $has_install; then
+        print_check "install directory (colcon workspace)"
+    elif $has_devel; then
+        print_check "devel directory (catkin workspace)"
+    else
+        print_circle "install/devel directory (not built yet)"
+    fi
+
+    # Count packages using utility function
+    if $has_src && find_workspace_packages; then
+        local total_packages
+        total_packages=$(echo "$WORKSPACE_PACKAGES" | wc -l)
+        echo ""
+        print_step "Packages: $total_packages total"
+
+        if [ "$total_packages" -gt 0 ]; then
+            local built_packages=0
+
+            # Count built packages using utility function
+            while IFS= read -r pkg_dir; do
+                if [ -n "$pkg_dir" ]; then
+                    local pkg_name
+                    pkg_name=$(basename "$pkg_dir")
+                    if check_package_built "$pkg_name"; then
+                        built_packages=$((built_packages + 1))
+                    fi
+                fi
+            done <<<"$WORKSPACE_PACKAGES"
+
+            print_check "Built: $built_packages"
+            print_circle "Not built: $((total_packages - built_packages))"
+        fi
+    fi
+
+    # Check ROS environment
+    echo ""
+    print_step "ROS Environment:"
+    if command -v ros2 >/dev/null 2>&1; then
+        local ros_distro
+        ros_distro=$(ros2 --version 2>/dev/null | grep -oE 'ros2.*' | head -1)
+        print_check "ROS2 available: $ros_distro"
+    else
+        print_cross "ROS2 not found in PATH"
+    fi
+
+    # Check if workspace is sourced
+    if [ -f "install/setup.bash" ] && [ -n "$AMENT_PREFIX_PATH" ]; then
+        if echo "$AMENT_PREFIX_PATH" | grep -q "$(pwd)/install"; then
+            print_check "Workspace is sourced"
+        else
+            print_circle "Workspace not sourced (run ros_source)"
+        fi
+    elif [ -f "devel/setup.bash" ] && [ -n "$CMAKE_PREFIX_PATH" ]; then
+        if echo "$CMAKE_PREFIX_PATH" | grep -q "$(pwd)/devel"; then
+            print_check "Workspace is sourced"
+        else
+            print_circle "Workspace not sourced (run ros_source)"
+        fi
+    else
+        print_circle "Workspace setup file not found (build first)"
+    fi
+
+    # Show disk usage
+    local workspace_size
+    workspace_size=$(du -sh . 2>/dev/null | cut -f1)
+    echo ""
+    print_step "Disk Usage: $workspace_size"
+
+    popd >/dev/null || return 1
+}

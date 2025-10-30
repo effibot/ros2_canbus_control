@@ -249,3 +249,18 @@ waveshare_socketcan_bridge/
 ---
 
 This todo list provides a structured path from your existing `waveshare_cpp` library to a fully functional CANopen motor control system using ROS2 standard tools. Start with Phase 1 and validate each step before moving forward!
+
+## note
+
+To set up proper permissions for the Waveshare USB-CAN-A adapter, you may need to create a udev rule. You can do this by editing or creating a new udev rules file. Here’s how to do it:
+
+```bash
+sudoedit /etc/udev/rules.d/50-myusb.rules
+```
+
+Add the following lines:
+
+```
+KERNEL=="ttyUSB[0-9]*",MODE="0666"
+KERNEL=="ttyACM[0-9]*",MODE="0666"
+```
