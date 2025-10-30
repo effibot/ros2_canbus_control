@@ -408,7 +408,7 @@ _execute_build() {
     local build_log
     build_log=$(create_temp_file)
 
-    # Run the build with tee to show output and capture it
+    # Run the build command directly with tee to show output and capture it
     eval "$build_cmd" 2>&1 | tee "$build_log"
     local build_exit_code=${PIPESTATUS[0]}
 
@@ -428,14 +428,16 @@ _execute_build() {
 
         # Count successful builds
         local success_count
-        success_count=$(grep -c "Finished.*packages.*\[.*s\]" "$build_log" 2>/dev/null || echo "0")
+        success_count=$(grep -c "Finished" "$build_log" 2>/dev/null | head -1)
+        success_count=${success_count:-0}
         if [ "$success_count" -gt 0 ]; then
             print_step "Successfully built $success_count packages"
         fi
 
         # Show warnings if any
         local warning_count
-        warning_count=$(grep -c "warning:" "$build_log" 2>/dev/null || echo "0")
+        warning_count=$(grep -c "warning:" "$build_log" 2>/dev/null | head -1)
+        warning_count=${warning_count:-0}
         if [ "$warning_count" -gt 0 ]; then
             print_warning "Build completed with $warning_count warnings"
         fi

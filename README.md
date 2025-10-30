@@ -264,3 +264,33 @@ Add the following lines:
 KERNEL=="ttyUSB[0-9]*",MODE="0666"
 KERNEL=="ttyACM[0-9]*",MODE="0666"
 ```
+
+Then reload the udev rules and replug the device:
+
+```bash
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
+To automatically load the can and vcan kernel modules at boot, you can add them to the `/etc/modules` file:
+
+```bash
+echo "can" | sudo tee -a /etc/modules
+echo "can-raw" | sudo tee -a /etc/modules
+echo "can-bcm" | sudo tee -a /etc/modules
+echo "vcan" | sudo tee -a /etc/modules
+```
+to load the modules immediately without rebooting, run:
+
+```bash
+sudo modprobe can
+sudo modprobe can-raw
+sudo modprobe can-bcm
+sudo modprobe vcan
+```
+Set up ip link for vcan0:
+
+```bash
+sudo ip link add dev vcan0 type vcan
+sudo ip link set up vcan0
+```
