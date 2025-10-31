@@ -1,0 +1,106 @@
+```mermaid
+---
+config:
+    theme: base
+    title: ROS2 CAN Bus Control System Architecture
+    themeVariables:
+        primaryColor: "#F5E5E1"
+        primaryTextColor: "#333333"
+        secondaryColor: "#F9B487"
+        tertiaryColor: "#427A76"
+        quaternaryColor: "#174143"
+        fontFamily: "Arial, sans-serif"
+---
+classDiagram
+    direction LR
+    classDef hardware fill:#D97D55,stroke:#333,stroke-width:1px,color:#fff
+    classDef bridge fill:#F4E9D7,stroke:#333,stroke-width:1px,color:#333
+    classDef ros2_layer fill:#bbf,stroke:#333,stroke-width:1px,color:#333
+
+
+    class CANOpenDriver:::hardware {
+        +eds_file
+        +pdo_mappings
+        +sdo_communication()
+        +nmt_state_management()
+        +pdo_handling()
+    }
+
+    class WaveshareAdapter~USB~:::hardware {
+        +STM32_chip
+        +USB_interface
+        +to_wire()
+        +from_wire()
+    }
+
+    class waveshare_cpp {
+        +WaveshareFrame
+        +USBAdapter
+        +SocketCAN
+        +SerialAdapter
+        +SocketCANBridge
+        +...
+        +read_from_usb()
+        +write_to_usb()
+        +read_from_socketcan()
+        +write_to_socketcan()
+        +waveshare_to_socketcan()
+        +socketcan_to_waveshare()
+        +...()
+    }
+    
+    class SocketCAN~Linux~ {
+        +vcan_interface
+        + ...
+        +create_vcan()
+        +delete_vcan()
+        +send_frame()
+        +receive_frame()
+        + ...()
+    }
+
+    class Application_Layer~ROS2~ {
+        +joystick_node
+        +position_feedback
+    }
+
+    class CANOpen~ROS2~ {
+        +canopen_master
+        +cia402_driver
+        +sdo_client
+        +pdo_manager
+        +nmt_manager
+        +eds_parser
+    }
+
+    class Control_Layer~ROS2~ {
+        +motion_planner
+        +trajectory_generator
+        +velocity_controller
+        +position_controller
+        +effort_controller
+    }
+
+    class BridgeWrapper~ROS2~ {
+        +bridge_node
+        +lifecycle_management
+        +parameter_handling
+        +diagnostics
+    }
+
+    WaveshareAdapter~USB~ <--> CANOpenDriver : "CAN Bus wire"
+    WaveshareAdapter~USB~ <--> waveshare_cpp : "Send/Receive Waveshare frames"
+
+    waveshare_cpp <--> SocketCAN~Linux~ : "Forward SocketCAN frames through Bridge"
+    Application_Layer~ROS2~ --> CANOpen~ROS2~ : "Send High-level commands"
+    CANOpen~ROS2~ <--> SocketCAN~Linux~ : "Sends/Receives CAN frames via SocketCAN"
+
+    BridgeWrapper~ROS2~ <--> waveshare_cpp : "Manages Bridge lifecycle & parameters"
+    
+    Application_Layer~ROS2~ ..> Control_Layer~ROS2~ : "Depends on"
+    CANOpen~ROS2~ ..> Control_Layer~ROS2~ : "Depends on"
+    BridgeWrapper~ROS2~ ..> waveshare_cpp : "Depends on"
+    BridgeWrapper~ROS2~ <..> CANOpen~ROS2~ : "ros dds"
+    BridgeWrapper~ROS2~ <..> Application_Layer~ROS2~ : "ros dds"
+    BridgeWrapper~ROS2~ <..> Control_Layer~ROS2~ : "ros dds"
+```

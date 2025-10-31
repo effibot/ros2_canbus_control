@@ -19,10 +19,10 @@
 using rclcpp_lifecycle::LifecycleNode;
 using rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface;
 // # waveshare_cpp includes
-#include "../lib/waveshare_cpp/include/waveshare.hpp"
+#include "../../lib/waveshare_cpp/include/waveshare.hpp"
 using namespace waveshare;
 
-namespace ros2_microphase {
+namespace ros2_waveshare {
     /**
      * @brief ROS2 Lifecycle node that manages the SocketCAN Bridge
      *  defined in waveshare_cpp library.

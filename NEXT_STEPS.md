@@ -3,7 +3,7 @@
 ## Current Status ✅
 
 ### Completed Components:
-1. ✅ **Waveshare Bridge Lifecycle Node** (`ros2_microphase` package)
+1. ✅ **Waveshare Bridge Lifecycle Node** (`ros2_waveshare` package)
    - Bridges Waveshare USB-CAN-A adapter to SocketCAN (vcan0)
    - Lifecycle management (configure → activate → deactivate)
    - Diagnostics integration with bridge statistics
@@ -100,7 +100,7 @@ sudo udevadm control --reload-rules
 ```
 
 #### 2. Configure Bridge Parameters
-Edit `/home/ubuntu/ros_ws/src/ros2_microphase/config/bridge_params.yaml`:
+Edit `/home/ubuntu/ros_ws/src/ros2_waveshare/config/bridge_params.yaml`:
 ```yaml
 usb_device: "/dev/ttyUSB0"  # Adjust if different
 can_baud: 1000000           # Must match motor driver
@@ -437,7 +437,7 @@ ros2 topic echo /diagnostics | grep -i error
 ## Key Configuration Files Summary
 
 ### 1. Bridge Configuration
-**File**: `/home/ubuntu/ros_ws/src/ros2_microphase/config/bridge_params.yaml`
+**File**: `/home/ubuntu/ros_ws/src/ros2_waveshare/config/bridge_params.yaml`
 ```yaml
 socketcan_interface: "vcan0"
 usb_device: "/dev/ttyUSB0"
@@ -459,26 +459,26 @@ nodes:
 ```
 
 ### 3. Launch Files
-- **Bridge only**: `ros2 launch ros2_microphase bridge_bringup.launch.py`
+- **Bridge only**: `ros2 launch ros2_waveshare bridge_bringup.launch.py`
 - **Complete system**: `ros2 launch microphase_can_config microphase_can_config.launch.py`
 
 ---
 
 ## Important CiA 402 Objects (from TRACTION_PWR.eds)
 
-| Object | Name | Description |
-|--------|------|-------------|
-| 0x6040 | Controlword | State machine control |
-| 0x6041 | Statusword | Motor state feedback |
-| 0x6060 | Modes of operation | Select control mode |
-| 0x6061 | Modes of operation display | Current mode |
-| 0x6064 | Position actual value | Encoder position |
-| 0x606C | Velocity actual value | Current velocity |
-| 0x6077 | Torque actual value | Current torque |
-| 0x607A | Target position | Position setpoint (CSP mode) |
-| 0x60FF | Target velocity | Velocity setpoint (CSV mode) |
-| 0x6071 | Target torque | Torque setpoint (CST mode) |
-| 0x603F | Error code | Fault diagnosis |
+| Object | Name                       | Description                  |
+| ------ | -------------------------- | ---------------------------- |
+| 0x6040 | Controlword                | State machine control        |
+| 0x6041 | Statusword                 | Motor state feedback         |
+| 0x6060 | Modes of operation         | Select control mode          |
+| 0x6061 | Modes of operation display | Current mode                 |
+| 0x6064 | Position actual value      | Encoder position             |
+| 0x606C | Velocity actual value      | Current velocity             |
+| 0x6077 | Torque actual value        | Current torque               |
+| 0x607A | Target position            | Position setpoint (CSP mode) |
+| 0x60FF | Target velocity            | Velocity setpoint (CSV mode) |
+| 0x6071 | Target torque              | Torque setpoint (CST mode)   |
+| 0x603F | Error code                 | Fault diagnosis              |
 
 **Control Modes**:
 - 0x01: Profile Position Mode (PP)

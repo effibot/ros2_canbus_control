@@ -12,7 +12,7 @@
     
     # CAN bus baud rate (must match your motor driver settings)
     # Options: 100000, 125000, 250000, 500000, 1000000
-    can_baud: 1000000
+    can_baud: 500000
     
     # CAN mode
     # 0 = NORMAL, 1 = LOOPBACK, 2 = SILENT, 3 = LOOPBACK_SILENT

@@ -21,7 +21,7 @@ def generate_launch_description():
     params_file_arg = DeclareLaunchArgument(
         'params_file',
         default_value=PathJoinSubstitution([
-            FindPackageShare('ros2_microphase'),
+            FindPackageShare('ros2_waveshare'),
             'config',
             'bridge_params.yaml'
         ]),
@@ -42,7 +42,7 @@ def generate_launch_description():
     
     # Create lifecycle node
     bridge_node = LifecycleNode(
-        package='ros2_microphase',
+        package='ros2_waveshare',
         executable='canopen_lifecycle_node',
         name='waveshare_bridge',
         namespace='',

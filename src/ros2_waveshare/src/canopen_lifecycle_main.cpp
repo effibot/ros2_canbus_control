@@ -7,7 +7,7 @@
 
 #include <memory>
 #include "rclcpp/rclcpp.hpp"
-#include "ros2_microphase/canopen_lifecycle.hpp"
+#include "ros2_waveshare/canopen_lifecycle.hpp"
 
 int main(int argc, char** argv) {
     // Initialize ROS2
@@ -17,7 +17,7 @@ int main(int argc, char** argv) {
     rclcpp::executors::SingleThreadedExecutor executor;
 
     // Create lifecycle node
-    auto node = std::make_shared<ros2_microphase::CanopenLifeCycleNode>(
+    auto node = std::make_shared<ros2_waveshare::CanopenLifeCycleNode>(
         rclcpp::NodeOptions());
 
     // Add node to executor

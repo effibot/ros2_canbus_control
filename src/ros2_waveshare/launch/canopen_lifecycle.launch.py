@@ -24,7 +24,7 @@ def generate_launch_description():
     Return: LaunchDescription: The launch description object containing all launch actions and configurations.
     """
     # Get package directory
-    pkg_dir = get_package_share_directory('ros2_microphase')
+    pkg_dir = get_package_share_directory('ros2_waveshare')
 
     # Declare launch arguments
     use_sim_time_arg = DeclareLaunchArgument(
@@ -53,7 +53,7 @@ def generate_launch_description():
 
     # Create lifecycle node
     bridge_node = LifecycleNode(
-        package='ros2_microphase',
+        package='ros2_waveshare',
         executable='canopen_lifecycle_node',
         name='waveshare_bridge',
         namespace='',

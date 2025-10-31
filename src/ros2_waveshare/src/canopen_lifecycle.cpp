@@ -1,7 +1,7 @@
-#include "ros2_microphase/canopen_lifecycle.hpp"
+#include "../include/ros2_waveshare/canopen_lifecycle.hpp"
 #include <diagnostic_msgs/msg/diagnostic_status.hpp>
 
-namespace ros2_microphase {
+namespace ros2_waveshare {
 
     CanopenLifeCycleNode::CanopenLifeCycleNode(const rclcpp::NodeOptions& options)
         : LifecycleNode("waveshare_bridge", options), diag_updater_(this) {
@@ -312,7 +312,7 @@ namespace ros2_microphase {
         diag_updater_.force_update();
     }
 
-} // namespace ros2_microphase
+} // namespace ros2_waveshare
 
 #include "rclcpp_components/register_node_macro.hpp"
-RCLCPP_COMPONENTS_REGISTER_NODE(ros2_microphase::CanopenLifeCycleNode)
+RCLCPP_COMPONENTS_REGISTER_NODE(ros2_waveshare::CanopenLifeCycleNode)
