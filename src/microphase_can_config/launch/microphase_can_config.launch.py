@@ -22,7 +22,7 @@ def generate_launch_description():
     waveshare_bridge = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             [
-                os.path.join(get_package_share_directory("ros2_microphase"), "launch"),
+                os.path.join(get_package_share_directory("ros2_waveshare"), "launch"),
                 "/bridge_bringup.launch.py",
             ]
         ),
