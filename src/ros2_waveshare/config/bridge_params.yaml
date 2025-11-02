@@ -16,7 +16,7 @@
     
     # CAN mode
     # 0 = NORMAL, 1 = LOOPBACK, 2 = SILENT, 3 = LOOPBACK_SILENT
-    can_mode: normal
+    can_mode: LOOPBACK
     
     # Auto retransmit on error
     auto_retransmit: true

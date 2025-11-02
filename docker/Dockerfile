@@ -169,6 +169,7 @@ RUN runuser -l ${USERNAME} -c '/tmp/scripts/install_gh_cli.sh'
 
 # Clean up installation scripts and apt cache
 RUN rm -rf /tmp/scripts \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ENV DEBIAN_FRONTEND=
 
