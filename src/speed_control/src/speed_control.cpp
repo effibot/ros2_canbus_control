@@ -16,7 +16,7 @@ SpeedControlNode::SpeedControlNode() : Node("speed_control_node") {
     //! Simplest syntax is, for any type:
     //! declare_parameter(NAME_STRING, DEFAULT_VALUE, DESCRIPTOR);
     this->declare_parameter<int>("method", 1);
-    this->declare_parameter("tty_device", "/dev/ttyUSB0");
+    this->declare_parameter("tty_device", "/dev/ttyUSB1");
     this->declare_parameter<int>("extern_reference", 0);
 
     method = this->get_parameter("method").as_int();
