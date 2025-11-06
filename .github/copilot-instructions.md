@@ -2,180 +2,254 @@
 
 ## Project Overview
 
-A ROS2-based CAN bus control middleware using Waveshare USB-CAN-A adapters for industrial motor control. The system bridges USB-CAN hardware to Linux SocketCAN, integrating with CANOpen protocols for servo drive control via CIA402 profiles.
+ROS2 middleware for industrial motor control using Waveshare USB-CAN-A adapters. The system bridges USB-CAN hardware (`/dev/ttyUSB*`) to Linux SocketCAN, integrating with CANOpen for MICROPHASE TRAC_PWR servo drives (DS-402 profile).
 
-**Current State**: Waveshare C++ library complete with SocketCAN bridge, ROS2 lifecycle nodes in development, targeting CI402 servo drive integration for position/velocity/torque control.
+**Status**: Waveshare C++ library complete (132 tests, 100%), SocketCAN bridge operational, CANOpen lifecycle nodes active, targeting 4-motor traction control with PDO/SDO.
 
-## System Architecture
+**Critical Architecture**: `USB Hardware → Serial Protocol → SocketCAN Bridge → CANOpen Stack → ROS2 Control`
 
-The system follows a layered architecture:
+## Core Components
 
-```
-Application Layer (ROS2) → CANOpen Stack → SocketCAN Bridge → Waveshare USB-CAN-A Hardware
-```
-
-### Core Components
-
-1. **Waveshare C++ Library** (`src/ros2_waveshare/lib/waveshare_cpp/`): Type-safe C++ library implementing State-First Architecture with CRTP patterns
-2. **ROS2 Lifecycle Bridge** (`src/ros2_waveshare/`): ROS2 nodes managing bridge lifecycle 
-3. **CANOpen Configuration** (`src/microphase_can_config/`): Device configuration for MICROPHASE SRL TRAC_PWR drives
-4. **Speed Control** (`src/speed_control/`): High-level motor control logic with PDO/SDO handling
+1. **Waveshare C++ Library** (`src/ros2_waveshare/lib/waveshare_cpp/`) - Git submodule
+   - State-First Architecture with CRTP patterns
+   - Serial I/O via POSIX termios2 (up to 2Mbps)
+   - Thread-safe: 3-mutex pattern (state/write/read)
+   - Frame types: FixedFrame (20B), VariableFrame (5-15B), ConfigFrame (20B)
+   
+2. **ROS2 Lifecycle Bridge** (`src/ros2_waveshare/`) - Package: `ros2_waveshare`
+   - `CanopenLifeCycleNode`: Manages SocketCAN bridge lifecycle
+   - Wraps `SocketCANBridge` from waveshare_cpp library
+   - Launch: `bridge_bringup.launch.py` with `bridge_params.yaml`
+   
+3. **CANOpen Configuration** (`src/microphase_can_config/`) - Package: `microphase_can_config`
+   - Bus config: `bus.yml` defines 4 nodes (IDs 2-5) + master (ID 1)
+   - EDS file: `config/can_config/eds/TRACTION_PWR.eds` (DS-402 compliant)
+   - Unified launch: `microphase_can_config.launch.py` starts bridge + CANOpen stack
+   
+4. **Speed Control** (`src/speed_control/`) - Package: `speed_control`
+   - High-level motor control with custom message types
+   - Legacy implementation - PDO/SDO handling being migrated to CANOpen stack
 
 ## Critical Development Patterns
 
-### 1. ROS2 Workspace Management
+### State-First Architecture (Waveshare Library)
 
-**Build System**: Uses colcon with symlink installs
+**Core Principle**: Frames hold state, buffers generated on-demand
+```cpp
+// CORRECT: State-first pattern
+FixedFrame frame;
+frame.set_id(0x123);              // Modifies data_state_.can_id
+frame.set_data({0x11, 0x22});     // Modifies data_state_.data
+auto buffer = frame.serialize();   // Generates 20-byte protocol buffer NOW
+
+// WRONG: Don't manipulate buffers directly
+// Frame does NOT expose internal buffers for modification
+```
+
+**CRTP Hierarchy**: `CoreInterface<T>` → `DataInterface<T>` → `FixedFrame/VariableFrame`
+- Interfaces use `derived()` to call `impl_serialize()`, `impl_deserialize()` in concrete frames
+- See `src/ros2_waveshare/lib/waveshare_cpp/.github/copilot-instructions.md` for full details
+
+### ROS2 Workspace Management
+
+**Build Commands** (always from workspace root):
 ```bash
-# Always build from workspace root
-cd /home/ubuntu/ros_ws
+# Full build with dependency install
+rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
 
-# Source setup after builds
+# Incremental build for specific packages
+colcon build --symlink-install --packages-select ros2_waveshare microphase_can_config
+
+# Source after every build
 source install/setup.bash
 ```
 
-**Environment Setup**: Use provided scripts for consistent environment:
-- `scripts/setup_ros2_environment.sh`: Configures ROS2 environment 
-- `scripts/build_ws.sh`: Automated dependency resolution and build
-- Environment variables: `ROS_DISTRO`, `WORKSPACE=/home/ubuntu/ros_ws`
+**Environment Setup**: 
+- Development currently in WSL (will move to Docker container)
+- Use `scripts/build_ws.sh` for automated builds (expects `WORKSPACE` env variable)
+- Workspace root varies by environment - use `$(pwd)` for relative paths in scripts
 
-### 2. Waveshare Library Integration
+### SocketCAN Bridge Setup
 
-**Location**: `src/ros2_waveshare/lib/waveshare_cpp/` (git submodule)
-**Key Pattern**: State-First Architecture - frames are stateful objects generating protocol buffers on-demand
-
-```cpp
-// State-first frame usage
-FixedFrame frame;
-frame.set_id(0x123);              // Modifies internal state
-frame.set_data({0x11, 0x22});     // No direct buffer manipulation
-auto buffer = frame.serialize();   // Generates protocol buffer on-demand
-```
-
-**Thread Safety**: `USBAdapter` uses `state_mutex_` (shared_mutex) for configuration, separate mutexes for I/O operations
-
-### 3. CAN Bus Workflow
-
-**Device Setup**: USB-CAN-A adapters appear as `/dev/ttyUSB*` devices requiring udev rules:
+**Required One-Time Setup**:
 ```bash
-# Required udev rule in /etc/udev/rules.d/50-myusb.rules
-KERNEL=="ttyUSB[0-9]*",MODE="0666"
-```
-
-**SocketCAN Bridge**: Essential for ROS2 CANOpen integration:
-- Virtual interfaces: Create `vcan0` for testing, real interfaces for hardware
-- Bridge translates between Waveshare protocol and SocketCAN frames bidirectionally
-
-**Module Loading**: Required kernel modules for CAN operations:
-```bash
+# 1. Load kernel modules immediately
 sudo modprobe can can-raw can-bcm vcan
-sudo ip link add dev vcan0 type vcan && sudo ip link set up vcan0
+
+# Persist modules at boot (create /etc/modules-load.d/vcan.conf)
+echo "can" | sudo tee /etc/modules-load.d/can.conf
+echo "can-raw" | sudo tee -a /etc/modules-load.d/can.conf
+echo "can-bcm" | sudo tee -a /etc/modules-load.d/can.conf
+echo "vcan" | sudo tee /etc/modules-load.d/vcan.conf
+
+# 2. Create virtual CAN interface (for testing without hardware)
+sudo ip link add dev vcan0 type vcan
+sudo ip link set up vcan0
+
+# 3. USB device permissions (persist via udev rule)
+# Create /etc/udev/rules.d/50-myusb.rules:
+KERNEL=="ttyUSB[0-9]*",MODE="0666"
+KERNEL=="ttyACM[0-9]*",MODE="0666"
+# Then: sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
-### 4. CANOpen Device Integration
+**Bridge Operation**: Node creates `/dev/ttyUSB0` ↔ `vcan0` bidirectional forwarding
+- Configure: Reads YAML params, validates USB device
+- Activate: Opens serial port, creates SocketCAN socket, starts forwarding threads
+- Deactivate: Stops threads, closes connections
 
-**Target Hardware**: MICROPHASE SRL TRAC_PWR drives (Vendor ID: 0x1A21, Product: 4)
-**Protocol**: DS-402 motion control profile with standard objects:
-- `0x6040`: Control Word (16-bit, PDO mappable)
-- `0x6041`: Status Word (16-bit, PDO mappable) 
-- `0x6060/6061`: Mode of Operation (display)
-- `0x607A`: Target Position, `0x60FF`: Target Velocity
-- `0x606C`: Velocity Actual, `0x6064`: Position Actual
+### CANOpen Device Integration
 
-**Configuration**: EDS files in `src/microphase_can_config/config/` define device parameters and PDO mappings
-
-### 5. Package Dependencies & Build
-
-**Key ROS2 Dependencies**:
-- `canopen_core`, `canopen_interfaces`: CANOpen stack integration
-- `lely_core_libraries`: Low-level CANOpen implementation
-- `rclcpp_lifecycle`: Lifecycle node management
-- `diagnostic_updater`: System health monitoring
-
-**Build Order**: Dependencies auto-resolved by `rosdep`, but understand:
-1. Waveshare C++ library (standalone CMake)
-2. Core ROS2 packages (microphase_can_config, ros2_waveshare)
-3. Application packages (speed_control)
-
-## Development Workflows
-
-### Testing Strategy
-
-**Waveshare Library**: 132 tests, hardware-independent via dependency injection
-```bash
-cd src/ros2_waveshare/lib/waveshare_cpp/
-cmake -B build && cmake --build build && ctest --test-dir build
+**DS-402 Object Dictionary** (from `TRACTION_PWR.eds`):
+```
+0x6040 - Control Word (16-bit, RW, PDO)    # State machine control
+0x6041 - Status Word (16-bit, RO, PDO)     # Drive state feedback
+0x6060 - Mode of Operation (8-bit, RW)     # 1=PP, 3=PV, 4=TQ, etc.
+0x607A - Target Position (32-bit, RW, PDO)
+0x60FF - Target Velocity (32-bit, RW, PDO)
+0x606C - Velocity Actual (32-bit, RO, PDO)
+0x6064 - Position Actual (32-bit, RO, PDO)
 ```
 
-**ROS2 Testing**: Use `colcon test` for package-level testing
+**Launch System**:
 ```bash
-colcon test --packages-select ros2_waveshare speed_control
-colcon test-result --verbose  # View detailed results
+# Full system: Bridge + CANOpen stack
+ros2 launch microphase_can_config microphase_can_config.launch.py
+
+# Verify lifecycle state
+ros2 lifecycle get /waveshare_bridge  # Should be: active
+
+# Monitor diagnostics
+ros2 topic echo /diagnostics
+
+# List CANOpen topics (once stack starts)
+ros2 topic list | grep -E 'rpdo|tpdo|sdo'
+```
+
+### Lifecycle Node Transitions
+
+**State Machine**: `unconfigured` → `inactive` → `active` → `inactive` → `cleanup` → `shutdown`
+
+**Transitions in `CanopenLifeCycleNode`**:
+- `on_configure`: Load YAML params, create `BridgeConfig`, validate USB device exists
+- `on_activate`: Instantiate `SocketCANBridge`, open serial + socket, start forwarding
+- `on_deactivate`: Stop bridge threads, close connections (USB still accessible)
+- `on_cleanup`: Destroy bridge object, reset params
+- `on_shutdown`: Final cleanup from any state
+
+**Launch File Automation**: `bridge_bringup.launch.py` uses `auto_configure` and `auto_activate` args to trigger transitions automatically.
+
+## Debugging Workflows
+
+**Testing Strategy**: Manual execution and debugging only - no automated integration tests currently implemented.
+
+### Hardware-Independent Testing
+```bash
+# Waveshare library unit tests (132 tests, no hardware needed)
+cd src/ros2_waveshare/lib/waveshare_cpp
+cmake -B build && cmake --build build
+ctest --test-dir build --output-on-failure
+
+# SocketCAN simulation (without USB adapter)
+# Terminal 1: Monitor vcan0
+candump vcan0
+
+# Terminal 2: Send test frames
+cansend vcan0 "123#DEADBEEF"
+
+# Terminal 3: Bridge with mock USB (if adapted for testing)
+./build/scripts/wave_reader /dev/ttyUSB0  # Will timeout if no device
 ```
 
 ### Hardware Debugging
-
-**USB-CAN Adapter**: Use `wave_reader` script for low-level debugging:
 ```bash
-# From waveshare_cpp build directory
-./build/scripts/wave_reader /dev/ttyUSB0
+# 1. Verify USB device presence
+ls -l /dev/ttyUSB*  # Should show ttyUSB0 (or similar)
+
+# 2. Check permissions
+sudo chmod 666 /dev/ttyUSB0  # Temporary fix
+
+# 3. Test direct USB communication (wave_reader from waveshare_cpp)
+cd src/ros2_waveshare/lib/waveshare_cpp/build
+./scripts/wave_reader /dev/ttyUSB0
+
+# 4. Run bridge standalone (non-ROS)
+./scripts/wave_bridge -d /dev/ttyUSB0 -i vcan0 -b 2000000 -c 1000000
+
+# 5. Monitor bridge in ROS2
+ros2 topic echo /diagnostics  # Shows TX/RX counts, errors
+ros2 lifecycle get /waveshare_bridge
 ```
 
-**SocketCAN Monitoring**: Standard Linux CAN utilities:
+**Serial Port Exclusivity**: Only one process can open `/dev/ttyUSB0`. If bridge is running, `wave_writer` auto-detects and falls back to SocketCAN mode.
+
+### CANOpen Stack Debugging
 ```bash
-candump vcan0                    # Monitor CAN traffic
-cansend vcan0 123#DEADBEEF      # Send test frames (CAN ID 0x123, data DEADBEEF)
+# Check node discovery
+ros2 topic echo /device_manager_node/heartbeat  # CANOpen heartbeat messages
+
+# SDO read example (once integrated)
+ros2 service call /sdo_read canopen_interfaces/srv/CORead "{node_id: 2, index: 0x6041, subindex: 0}"
+
+# PDO monitoring
+ros2 topic echo /tpdo1  # Check for position/velocity feedback
 ```
 
-### Lifecycle Management
+## File Organization
 
-**ROS2 Nodes**: Use lifecycle patterns for graceful startup/shutdown:
-- Configure → Activate → Deactivate → Cleanup states
-- Bridge nodes manage USB adapter connection lifecycle
-- Diagnostic publishing for system health monitoring
+**Configuration**: All YAML/launch files in `*/config/` and `*/launch/` subdirectories
+- `bridge_params.yaml`: Serial baud (2Mbps), CAN baud (500k/1Mbps), interface names
+- `bus.yml`: CANOpen node IDs, EDS paths, driver types
+- EDS files: Device object dictionaries (don't edit unless hardware spec changes)
 
-## File Organization Conventions
+**Source Layout**:
+- `include/<package>/`: Public headers (installed)
+- `src/`: Implementation files (.cpp)
+- `scripts/`: Standalone utilities (wave_reader, wave_writer, etc.)
+- `doc/`: Architecture diagrams (Mermaid), integration guides
 
-### Configuration Management
-- **Launch files**: `*/launch/*.launch.py` with parameterized configurations
-- **Parameters**: YAML files in `*/config/` directories
-- **Device configs**: EDS files for CANOpen device descriptions
+**Git Submodules**: `waveshare_cpp` is a submodule. Update with:
+```bash
+git submodule update --remote src/ros2_waveshare/lib/waveshare_cpp
+# Then commit the submodule pointer change
+```
 
-### Source Structure
-- **Headers**: Public interfaces in `include/*/` 
-- **Implementation**: Source files in `src/`
-- **Scripts**: Utilities and tools in `scripts/` (executable)
-- **Documentation**: Architecture docs in `doc/`, README files at package level
+## Common Issues
 
-### Git Workflow
-- **Branch**: Currently on `microphase` branch for servo drive integration
-- **Submodules**: Waveshare library is a git submodule, update carefully
-- **CI/CD**: GitHub workflows for automated testing (when available)
+**Build Failures**:
+- Missing ROS2 deps: `rosdep install --from-paths src --ignore-src -r -y`
+- Submodule not initialized: `git submodule update --init --recursive`
+- Stale CMake cache: `rm -rf build/ install/` then rebuild
 
-## Integration Points
+**Runtime Errors**:
+- "Device not found": Check `/dev/ttyUSB*` exists, verify udev rules
+- "Permission denied": Run `sudo chmod 666 /dev/ttyUSB0` or fix udev rules
+- "CAN interface not found": Verify `ip link show vcan0` shows interface UP
+- Bridge won't activate: Check serial/CAN baud rates in YAML match hardware config
 
-### Cross-Package Communication
-- **CAN frames**: Standard SocketCAN interface between all ROS2 nodes
-- **Control commands**: `geometry_msgs/Twist` and custom message types
-- **Status feedback**: Motor status via `diagnostic_msgs` and custom status messages
-- **Service calls**: Configuration and emergency stop via ROS2 services
+**CANOpen Issues**:
+- No motor response: Verify CAN baud rate (1Mbps typical), node IDs (2-5) match physical DIP switches
+- PDO not received: Check EDS PDO mappings match motor configuration
 
-### External Dependencies
-- **Linux kernel**: CAN socket support, USB serial drivers (ch341-uart)
-- **Hardware**: Waveshare USB-CAN-A adapters, MICROPHASE servo drives
-- **CANOpen stack**: Lely libraries for protocol implementation
+## DevContainer Support
 
-## Common Issues & Solutions
+**Multi-GPU Configurations**: `.devcontainer/intel-gpu/` and `.devcontainer/nvidia-gpu/`
+- Supports Xorg and Wayland
+- Use `.devcontainer/setup-devcontainer.sh` to select configuration
+- Each config includes ROS2 Humble, CAN tools, hardware acceleration
 
-### Build Failures
-- **Missing dependencies**: Run `rosdep install --from-paths src --ignore-src -r -y`
-- **Submodule issues**: Ensure `git submodule update --init --recursive`
-- **CMake cache**: Clear `build/` directory for clean builds
+## Integration with External Systems
 
-### Runtime Issues  
-- **Device permissions**: Check udev rules for `/dev/ttyUSB*` access
-- **CAN modules**: Verify kernel modules loaded with `lsmod | grep can`
-- **SocketCAN interfaces**: Use `ip link show` to verify interface state
+**ros2_canopen Stack** (Lely-based):
+- Expects SocketCAN interface (bridge provides this)
+- Loads EDS files at launch, generates DCF files
+- Manages NMT state machine, SDO configuration, PDO subscriptions
 
-Focus on the bridge architecture - the Waveshare library provides the low-level CAN communication, while ROS2 packages handle the application logic and CANOpen protocol integration.
+**ros2_control** (Future):
+- Hardware interface will communicate via CANOpen topics/services
+- Control loop runs at ROS2 rate, PDOs provide real-time feedback
+
+**External CAN Tools**: Standard Linux utilities work via SocketCAN:
+- `candump`, `cansend`, `cangen`, `cansequence` for testing
+- `can-utils` package provides full toolchain

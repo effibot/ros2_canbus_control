@@ -235,7 +235,7 @@ sudo ip link set up vcan0
 
 # Test CAN utilities
 candump vcan0 &
-cansend vcan0 123#DEADBEEF
+cansend vcan0 "123#DEADBEEF"
 
 # You should see the message in candump output
 # Kill candump: pkill candump

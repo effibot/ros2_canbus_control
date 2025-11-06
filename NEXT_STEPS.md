@@ -67,7 +67,7 @@ ros2 topic list
 candump vcan0
 
 # Terminal 4: Send test CAN message
-cansend vcan0 123#DEADBEEF
+cansend vcan0 "123#DEADBEEF"
 
 # You should see the message in candump
 ```
