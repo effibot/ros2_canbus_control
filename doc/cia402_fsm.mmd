@@ -1,0 +1,28 @@
+---
+config:
+    theme: forest
+---
+stateDiagram-v2
+    [*] --> NOT_READY_TO_SWITCH_ON
+    NOT_READY_TO_SWITCH_ON --> SWITCH_ON_DISABLED: Automatic
+    
+    SWITCH_ON_DISABLED --> READY_TO_SWITCH_ON: Shutdown (0x06)
+    READY_TO_SWITCH_ON --> SWITCHED_ON: Switch On (0x07)
+    SWITCHED_ON --> OPERATION_ENABLED: Enable Operation (0x0F)
+    
+    OPERATION_ENABLED --> SWITCHED_ON: Disable Operation (0x07)
+    SWITCHED_ON --> READY_TO_SWITCH_ON: Switch On Disabled (0x00)
+    READY_TO_SWITCH_ON --> SWITCH_ON_DISABLED: Disable Voltage (0x00)
+    
+    OPERATION_ENABLED --> QUICK_STOP_ACTIVE: Quick Stop (0x02)
+    QUICK_STOP_ACTIVE --> OPERATION_ENABLED: Enable Operation (0x0F)
+    
+    SWITCH_ON_DISABLED --> FAULT: Fault Detected
+    READY_TO_SWITCH_ON --> FAULT: Fault Detected
+    SWITCHED_ON --> FAULT: Fault Detected
+    OPERATION_ENABLED --> FAULT: Fault Detected
+    QUICK_STOP_ACTIVE --> FAULT: Fault Detected
+    
+    FAULT --> FAULT_REACTION_ACTIVE: Automatic
+    FAULT_REACTION_ACTIVE --> FAULT: Automatic
+    FAULT --> SWITCH_ON_DISABLED: Fault Reset (0x80)

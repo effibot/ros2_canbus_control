@@ -73,6 +73,124 @@
       "default_value": 1000,
       "unit": "mA",
       "description": "Maximum motor current limit"
+    },
+    "target_position": {
+      "index": "0x607A",
+      "subindex": 0,
+      "datatype": "int32_t",
+      "access": "rw",
+      "unit": "counts",
+      "description": "Target position for Profile Position mode"
+    },
+    "position_demand": {
+      "index": "0x6062",
+      "subindex": 0,
+      "datatype": "int32_t",
+      "access": "ro",
+      "unit": "counts",
+      "description": "Position demand value"
+    },
+    "velocity_demand": {
+      "index": "0x6043",
+      "subindex": 0,
+      "datatype": "int32_t",
+      "access": "ro",
+      "unit": "rpm",
+      "description": "Velocity demand value"
+    },
+    "torque_actual": {
+      "index": "0x6077",
+      "subindex": 0,
+      "datatype": "int16_t",
+      "access": "ro",
+      "unit": "per_mille",
+      "description": "Actual torque (per mille of rated torque)"
+    },
+    "target_torque": {
+      "index": "0x6071",
+      "subindex": 0,
+      "datatype": "int16_t",
+      "access": "rw",
+      "unit": "per_mille",
+      "description": "Target torque (per mille of rated torque)"
+    },
+    "motor_rated_current": {
+      "index": "0x6075",
+      "subindex": 0,
+      "datatype": "uint32_t",
+      "access": "rw",
+      "unit": "mA",
+      "description": "Motor rated current"
+    },
+    "motor_rated_torque": {
+      "index": "0x6076",
+      "subindex": 0,
+      "datatype": "uint32_t",
+      "access": "rw",
+      "unit": "mNm",
+      "description": "Motor rated torque"
+    },
+    "max_motor_speed": {
+      "index": "0x6080",
+      "subindex": 0,
+      "datatype": "uint32_t",
+      "access": "rw",
+      "unit": "rpm",
+      "description": "Maximum motor speed"
+    },
+    "profile_velocity": {
+      "index": "0x6081",
+      "subindex": 0,
+      "datatype": "uint32_t",
+      "access": "rw",
+      "unit": "rpm",
+      "description": "Target velocity for profile mode"
+    },
+    "profile_acceleration": {
+      "index": "0x6083",
+      "subindex": 0,
+      "datatype": "uint32_t",
+      "access": "rw",
+      "unit": "rpm_per_sec",
+      "description": "Acceleration rate"
+    },
+    "profile_deceleration": {
+      "index": "0x6084",
+      "subindex": 0,
+      "datatype": "uint32_t",
+      "access": "rw",
+      "unit": "rpm_per_sec",
+      "description": "Deceleration rate"
+    },
+    "quick_stop_deceleration": {
+      "index": "0x6085",
+      "subindex": 0,
+      "datatype": "uint32_t",
+      "access": "rw",
+      "unit": "rpm_per_sec",
+      "description": "Quick stop deceleration rate"
+    },
+    "digital_inputs": {
+      "index": "0x60FD",
+      "subindex": 0,
+      "datatype": "uint32_t",
+      "access": "ro",
+      "description": "Digital input states (bit field)"
+    },
+    "digital_outputs": {
+      "index": "0x60FE",
+      "subindex": 1,
+      "datatype": "uint32_t",
+      "access": "rw",
+      "description": "Digital output states (bit field)"
+    },
+    "temperature": {
+      "index": "0x2205",
+      "subindex": 1,
+      "datatype": "int16_t",
+      "access": "ro",
+      "unit": "celsius",
+      "description": "Driver/motor temperature"
     }
   },
   "pdo_configuration": {

@@ -25,6 +25,7 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include "ros2_waveshare/canopen/object_dictionary.hpp"
 #include "ros2_waveshare/canopen/sdo_client.hpp"
+#include "ros2_waveshare/canopen/cia402_constants.hpp"
 #include <iostream>
 #include <iomanip>
 #include <thread>
@@ -32,6 +33,7 @@
 #include <filesystem>
 
 using namespace canopen;
+using namespace canopen::cia402;
 using Catch::Matchers::ContainsSubstring;
 
 // ==============================================================================
@@ -41,25 +43,12 @@ using Catch::Matchers::ContainsSubstring;
 /**
  * @brief Decode CIA402 statusword into human-readable state
  */
-std::string decode_statusword(uint16_t statusword) {
-    // Bits 0-6 define the state (mask: 0x6F)
-    uint8_t state_bits = statusword & 0x6F;
-
-    if ((state_bits & 0x4F) == 0x00) return "NOT_READY_TO_SWITCH_ON";
-    if ((state_bits & 0x4F) == 0x40) return "SWITCH_ON_DISABLED";
-    if ((state_bits & 0x6F) == 0x21) return "READY_TO_SWITCH_ON";
-    if ((state_bits & 0x6F) == 0x23) return "SWITCHED_ON";
-    if ((state_bits & 0x6F) == 0x27) return "OPERATION_ENABLED";
-    if ((state_bits & 0x6F) == 0x07) return "QUICK_STOP_ACTIVE";
-    if ((state_bits & 0x4F) == 0x0F) return "FAULT_REACTION_ACTIVE";
-    if ((state_bits & 0x4F) == 0x08) return "FAULT";
-
-    return "UNKNOWN";
-}
-
-/**
- * @brief Check if vcan0 interface is available
- */
+std::string decode_statusword_string(uint16_t statusword) {
+    State state = decode_statusword(statusword);
+    return state_to_string(state);
+}/**
+  * @brief Check if vcan0 interface is available
+  */
 bool is_vcan0_available() {
     return std::filesystem::exists("/sys/class/net/vcan0");
 }
@@ -150,7 +139,7 @@ TEST_CASE("SDO Integration: Read Statusword", "[integration][sdo][statusword]") 
         uint16_t statusword = sdo_client.read<uint16_t>("statusword");
 
         // Decode and display
-        std::string state = decode_statusword(statusword);
+        std::string state = decode_statusword_string(statusword);
         INFO("  Statusword: 0x" << std::hex << std::setw(4) << std::setfill('0') << statusword);
         INFO("  Motor State: " << state);
 
@@ -158,14 +147,13 @@ TEST_CASE("SDO Integration: Read Statusword", "[integration][sdo][statusword]") 
         bool is_valid_state = (state != "UNKNOWN");
         REQUIRE(is_valid_state);
 
-        // Additional info
-        if ((statusword & 0x08) != 0) {
+        // Additional info using cia402 helper functions
+        if (has_fault(statusword)) {
             INFO("  ⚠ Fault detected in statusword");
         }
-        if ((statusword & 0x10) != 0) {
+        if (voltage_enabled(statusword)) {
             INFO("  ✓ Voltage enabled");
         }
-
     } catch (const std::exception& e) {
         FAIL("SDO read failed: " << e.what());
     }
@@ -194,12 +182,12 @@ TEST_CASE("SDO Integration: Read Error Register", "[integration][sdo][error]") {
             INFO("  ✓ No errors detected");
         } else {
             WARN("  Errors detected:");
-            if (error_reg & 0x01) WARN("    - Generic error");
-            if (error_reg & 0x02) WARN("    - Current error");
-            if (error_reg & 0x04) WARN("    - Voltage error");
-            if (error_reg & 0x08) WARN("    - Temperature error");
-            if (error_reg & 0x10) WARN("    - Communication error");
-            if (error_reg & 0x20) WARN("    - Device profile specific");
+            if (error_reg & ERR_GENERIC) WARN("    - Generic error");
+            if (error_reg & ERR_CURRENT) WARN("    - Current error");
+            if (error_reg & ERR_VOLTAGE) WARN("    - Voltage error");
+            if (error_reg & ERR_TEMPERATURE) WARN("    - Temperature error");
+            if (error_reg & ERR_COMMUNICATION) WARN("    - Communication error");
+            if (error_reg & ERR_DEVICE_PROFILE) WARN("    - Device profile specific");
         }
 
         // Test passes regardless, just informational
@@ -230,16 +218,21 @@ TEST_CASE("SDO Integration: Read Mode of Operation", "[integration][sdo][mode]")
 
         std::string mode_name;
         switch (mode_display) {
-        case 1: mode_name = "Profile Position"; break;
-        case 3: mode_name = "Profile Velocity"; break;
-        case 4: mode_name = "Torque Profile"; break;
-        case 6: mode_name = "Homing"; break;
-        case 8: mode_name = "Cyclic Sync Position"; break;
-        case 9: mode_name = "Cyclic Sync Velocity"; break;
-        case 10: mode_name = "Cyclic Sync Torque"; break;
+        case static_cast<int8_t>(OperationMode::PROFILE_POSITION): mode_name = "Profile Position";
+            break;
+        case static_cast<int8_t>(OperationMode::PROFILE_VELOCITY): mode_name = "Profile Velocity";
+            break;
+        case static_cast<int8_t>(OperationMode::TORQUE_PROFILE): mode_name = "Torque Profile";
+            break;
+        case static_cast<int8_t>(OperationMode::HOMING): mode_name = "Homing"; break;
+        case static_cast<int8_t>(OperationMode::CYCLIC_SYNC_POSITION): mode_name =
+                "Cyclic Sync Position"; break;
+        case static_cast<int8_t>(OperationMode::CYCLIC_SYNC_VELOCITY): mode_name =
+                "Cyclic Sync Velocity"; break;
+        case static_cast<int8_t>(OperationMode::CYCLIC_SYNC_TORQUE): mode_name =
+                "Cyclic Sync Torque"; break;
         default: mode_name = "Unknown/Not Set"; break;
         }
-
         INFO("  Mode Name: " << mode_name);
 
         // Verify it's a valid mode (1-10 or 0 if not set)
@@ -294,7 +287,7 @@ TEST_CASE("SDO Integration: Write Mode of Operation (Safe)", "[integration][sdo]
 
         // First check if motor is in fault
         uint16_t statusword = sdo_client.read<uint16_t>("statusword");
-        if ((statusword & 0x4F) == 0x08) {
+        if (has_fault(statusword)) {
             WARN("Motor is in FAULT state - skipping write test");
             SKIP("Motor in fault - cannot write mode");
         }
@@ -305,7 +298,8 @@ TEST_CASE("SDO Integration: Write Mode of Operation (Safe)", "[integration][sdo]
 
         // Write Profile Velocity mode (3)
         INFO("Writing Mode of Operation (0x6060) to Profile Velocity (3)...");
-        bool write_ok = sdo_client.write<int8_t>("modes_of_operation", 3);
+        bool write_ok = sdo_client.write<int8_t>("modes_of_operation",
+            static_cast<int8_t>(OperationMode::PROFILE_VELOCITY));
         REQUIRE(write_ok);
         INFO("  ✓ Write successful");
 
@@ -315,8 +309,7 @@ TEST_CASE("SDO Integration: Write Mode of Operation (Safe)", "[integration][sdo]
         INFO("  Verified mode: " << static_cast<int>(verify_mode));
 
         // Mode should be 3 (Profile Velocity)
-        REQUIRE(verify_mode == 3);
-
+        REQUIRE(verify_mode == static_cast<int8_t>(OperationMode::PROFILE_VELOCITY));
     } catch (const std::exception& e) {
         FAIL("SDO write/verify failed: " << e.what());
     }
