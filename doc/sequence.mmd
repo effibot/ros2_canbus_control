@@ -1,0 +1,24 @@
+sequenceDiagram
+    participant App as Teleop/Nav
+    participant Vel as VelocityConverter
+    participant Cmd as CommandMapper
+    participant CAN as CANopen Handler
+    participant Bus as CAN Bus
+    participant Drv as Motor Driver
+    
+    Note over Vel,Cmd: Initialization Phase
+    Cmd->>CAN: Load EDS & Config
+    CAN->>Bus: NMT Start Remote Node
+    CAN->>Bus: Configure PDOs
+    
+    Note over App,Drv: Runtime Operation
+    App->>Vel: Twist(linear, angular)
+    Vel->>Cmd: wheel_left_vel, wheel_right_vel
+    Cmd->>CAN: writeObject(target_velocity)
+    CAN->>Bus: RPDO Frame
+    Bus->>Drv: CAN Message
+    
+    Drv->>Bus: TPDO Frame (status, position, velocity)
+    Bus->>CAN: Receive Frame
+    CAN->>Cmd: Update Object Dictionary
+    Cmd->>App: Publish JointState, Status
