@@ -1,0 +1,52 @@
+---
+config:
+    theme: forest
+---
+graph TB
+    subgraph "Configuration Layer"
+        JSON[motor_config.json]
+        EDS[TRACTION_PWR.eds]
+        OD[ObjectDictionary]
+        JSON --> OD
+        EDS -.->|Parsed Offline| JSON
+    end
+    
+    subgraph "Core CANopen Driver Layer"
+        OD --> CD[CANopenDriver]
+        CD --> CIA[CIA402StateMachine]
+        CD --> PDO[PDOManager]
+        CD --> SDO[SDOClient]
+    end
+    
+    subgraph "SocketCAN Communication Layer"
+        PDO --> SC[SocketCAN Client<br/>can_frame operations]
+        SDO --> SC
+        SC -->|socket AF_CAN| SOCK[(SocketCAN Interface<br/>vcan0)]
+    end
+    
+    subgraph "Waveshare Bridge (External Process) ✓"
+        SOCK <-->|Standard CAN Frames<br/>Transparent Forwarding| BR[SocketCANBridge<br/>Separate Node]
+        BR <-->|USB Serial Protocol<br/>Waveshare Framing| USB[USB-CAN Adapter]
+    end
+    
+    subgraph "ROS2 Interface Layer"
+        CIA --> MN[MotorDriverNode]
+        MN --> CV["/cmd_vel"]
+        MN --> JS["/joint_states"]
+        MN --> DS["/diagnostics"]
+        CV --> MN
+    end
+    
+    subgraph "Hardware"
+        USB <-->|CAN Bus 500kbps| HW[Motor Driver<br/>Node ID: 1]
+    end
+    
+    style BR fill:#90EE90,stroke:#2d7a2d,stroke-width:3px
+    style USB fill:#90EE90,stroke:#2d7a2d,stroke-width:3px
+    style JSON fill:#FFD700
+    style OD fill:#FFD700
+    style CD fill:#FF6347
+    style CIA fill:#FF6347
+    style MN fill:#FF6347
+    style SC fill:#87ceeb,stroke:#4682b4,stroke-width:2px
+    style SOCK fill:#ffd966,stroke:#d68910,stroke-width:2px

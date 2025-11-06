@@ -1,57 +1,26 @@
 cmake_minimum_required(VERSION 3.8)
 project(ros2_waveshare)
 
+# ==============================================================================
+# Compiler Settings
+# ==============================================================================
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic -O2 -Wno-unused-parameter)
 endif()
 
-# C++ standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find dependencies
+# ==============================================================================
+# Find Dependencies
+# ==============================================================================
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(diagnostic_updater REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
-
-# Optional: Only if you're using ros2_canopen features in this package
-# find_package(canopen_core REQUIRED)
-# find_package(canopen_interfaces REQUIRED)
-# find_package(canopen_base_driver REQUIRED)
-# find_package(canopen_proxy_driver REQUIRED)
-# find_package(lely_core_libraries REQUIRED)
-
-# Include directories
-include_directories(
-  include
-)
-
-# Find waveshare_cpp library
-# Option 1: If waveshare_cpp is in lib/ subdirectory as a CMake project
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lib/waveshare_cpp/CMakeLists.txt)
-  add_subdirectory(lib/waveshare_cpp)
-  set(WAVESHARE_FOUND TRUE)
-  set(WAVESHARE_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/lib/waveshare_cpp/include)
-  set(WAVESHARE_LIBRARIES waveshare_cpp)
-# Option 2: If waveshare_cpp is installed as a system package
-elseif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lib/include/waveshare.hpp)
-  set(WAVESHARE_FOUND TRUE)
-  set(WAVESHARE_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/lib/include)
-  # Build library from source files
-  file(GLOB_RECURSE WAVESHARE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/lib/src/*.cpp)
-  add_library(waveshare_cpp STATIC ${WAVESHARE_SOURCES})
-  target_include_directories(waveshare_cpp PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/lib/include
-  )
-  set(WAVESHARE_LIBRARIES waveshare_cpp)
-else()
-  message(FATAL_ERROR "waveshare_cpp library not found in lib/ directory")
-endif()
-
-include_directories(${WAVESHARE_INCLUDE_DIRS})
+find_package(nlohmann_json REQUIRED)
 
 # Dependencies list
 set(dependencies
@@ -62,7 +31,38 @@ set(dependencies
   lifecycle_msgs
 )
 
-# Build lifecycle node executable
+# ==============================================================================
+# Waveshare Library
+# ==============================================================================
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lib/waveshare_cpp/CMakeLists.txt)
+  add_subdirectory(lib/waveshare_cpp)
+  set(WAVESHARE_FOUND TRUE)
+  set(WAVESHARE_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/lib/waveshare_cpp/include)
+  set(WAVESHARE_LIBRARIES waveshare_cpp)
+elseif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lib/include/waveshare.hpp)
+  set(WAVESHARE_FOUND TRUE)
+  set(WAVESHARE_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/lib/include)
+  file(GLOB_RECURSE WAVESHARE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/lib/src/*.cpp)
+  add_library(waveshare_cpp STATIC ${WAVESHARE_SOURCES})
+  target_include_directories(waveshare_cpp PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/lib/include)
+  set(WAVESHARE_LIBRARIES waveshare_cpp)
+else()
+  message(FATAL_ERROR "waveshare_cpp library not found in lib/ directory")
+endif()
+
+include_directories(
+  include
+  ${WAVESHARE_INCLUDE_DIRS}
+)
+
+# ==============================================================================
+# CANopen Core Library (Modular)
+# ==============================================================================
+add_subdirectory(src/canopen)
+
+# ==============================================================================
+# Lifecycle Node Executable
+# ==============================================================================
 add_executable(canopen_lifecycle_node
   src/canopen_lifecycle.cpp
   src/canopen_lifecycle_main.cpp
@@ -78,34 +78,41 @@ target_link_libraries(canopen_lifecycle_node
   ${WAVESHARE_LIBRARIES}
 )
 
-ament_target_dependencies(canopen_lifecycle_node
-  ${dependencies}
-)
+ament_target_dependencies(canopen_lifecycle_node ${dependencies})
 
-# Install executable
-install(TARGETS canopen_lifecycle_node
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-# Install directories
-install(DIRECTORY 
-  launch 
-  config 
-  DESTINATION share/${PROJECT_NAME}
-)
-
-# Install headers
-install(DIRECTORY include/
-  DESTINATION include
-)
-
+# ==============================================================================
+# Testing (Modular with Catch2)
+# ==============================================================================
 if(BUILD_TESTING)
+  add_subdirectory(test)
+  
+  # Ament linting
   find_package(ament_lint_auto REQUIRED)
   set(ament_cmake_copyright_FOUND TRUE)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
 
+# ==============================================================================
+# Installation
+# ==============================================================================
+install(TARGETS canopen_lifecycle_node canopen_core
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY 
+  launch 
+  config 
+  DESTINATION share/${PROJECT_NAME}
+)
+
+install(DIRECTORY include/
+  DESTINATION include
+)
+
+# ==============================================================================
+# Ament Package Export
+# ==============================================================================
 ament_export_include_directories(include)
 ament_export_dependencies(${dependencies})
 

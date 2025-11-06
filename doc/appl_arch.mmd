@@ -1,0 +1,50 @@
+---
+config:
+    theme: forest
+---
+graph TB
+    subgraph "High-Level Applications"
+        A[Teleop Node] -->|geometry_msgs/Twist| B["/cmd_vel topic"]
+        C[Navigation Stack] -->|geometry_msgs/Twist| B
+    end
+    
+    subgraph "ROS2 Motor Driver Node"
+        B --> D[Velocity Converter]
+        D --> E[Command Mapper]
+        E -->|Target Velocity| F[CANopen Protocol Handler]
+        
+        F -->|SDO/PDO Write| G[SocketCAN Client<br/>socket AF_CAN]
+        G -->|Standard CAN Frames| H[(SocketCAN Interface<br/>vcan0)]
+        
+        H -->|Standard CAN Frames| G
+        G -->|SDO/PDO Read| F
+        F --> I[Object Dictionary Manager]
+        I --> J[State Publisher]
+        I --> K[Diagnostics Publisher]
+        
+        J -->|sensor_msgs/JointState| L["/joint_states topic"]
+        J -->|microphase_msgs/MotorStatus| M["/driver/status topic"]
+        K -->|diagnostic_msgs/DiagnosticArray| N["/diagnostics topic"]
+        
+        O[motor_config.json] -.->|Load Config| I
+        P[traction_motor.yaml] -.->|ROS2 Params| D
+        P -.->|ROS2 Params| I
+    end
+    
+    subgraph "Waveshare Bridge Node (Separate Process) ✓"
+        H <-->|Bidirectional<br/>Transparent Forwarding| BR[SocketCANBridge]
+        BR <-->|Waveshare USB Serial Protocol| USB[USB-CAN Adapter]
+    end
+    
+    subgraph "Physical Layer"
+        USB <-->|CAN Bus 500kbps| Q[Motor Driver<br/>Node ID: 1]
+        Q <-->|Power 24V/48V| R[Traction Motor]
+    end
+    
+    style D fill:#e1f5ff
+    style I fill:#e1f5ff
+    style F fill:#ffe1f5
+    style G fill:#87ceeb,stroke:#4682b4,stroke-width:2px
+    style BR fill:#90EE90,stroke:#2d7a2d,stroke-width:3px
+    style USB fill:#90EE90,stroke:#2d7a2d,stroke-width:3px
+    style H fill:#ffd966,stroke:#d68910,stroke-width:3px
