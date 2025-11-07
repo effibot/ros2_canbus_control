@@ -18,13 +18,16 @@
  * - Motor driver Node ID = 1
  */
 
-#include "ros2_waveshare/canopen/object_dictionary.hpp"
-#include "ros2_waveshare/canopen/sdo_client.hpp"
+#include "canopen/object_dictionary.hpp"
+#include "canopen/sdo_client.hpp"
+#include "io/real_can_socket.hpp"
 #include <iostream>
 #include <iomanip>
 #include <thread>
 #include <chrono>
 #include <csignal>
+#include <filesystem>
+#include <fstream>
 
 // ANSI color codes for terminal output
 #define COLOR_RESET   "\033[0m"
@@ -96,6 +99,37 @@ void print_error_register(uint8_t error_reg) {
     if (error_reg & 0x80) std::cout << "    - Manufacturer specific\n";
 }
 
+// Helper to find config file in multiple locations
+std::string find_config_file(const std::string& filename) {
+    namespace fs = std::filesystem;
+    
+    // List of paths to search (in order of priority)
+    std::vector<std::string> search_paths = {
+        filename,  // Direct path if provided by user
+        "../config/" + filename,  // From build directory
+        "../../config/" + filename,  // From install/lib directory
+        "../../../src/ros2_waveshare/config/" + filename,  // From build directory to source
+        "config/" + filename,  // Current directory
+        "/home/ros/ws/ros2_canbus_control/src/ros2_waveshare/config/" + filename  // Absolute fallback
+    };
+    
+    for (const auto& path : search_paths) {
+        if (fs::exists(path)) {
+            return fs::absolute(path).string();
+        }
+    }
+    
+    throw std::runtime_error("Config file not found: " + filename + 
+                           "\nSearched paths:\n" + 
+                           [&]() {
+                               std::string paths;
+                               for (const auto& p : search_paths) {
+                                   paths += "  - " + p + "\n";
+                               }
+                               return paths;
+                           }());
+}
+
 int main(int argc, char** argv) {
     // Install signal handlers
     std::signal(SIGINT, signal_handler);
@@ -109,12 +143,15 @@ int main(int argc, char** argv) {
                   << COLOR_RESET << "\n\n";
 
         // Get config file path
-        std::string config_path = "../config/motor_config.json";
+        std::string config_filename = "motor_config.json";
         if (argc > 1) {
-            config_path = argv[1];
+            config_filename = argv[1];
         }
 
-        std::cout << "[1] Loading configuration from: " << config_path << "\n";
+        std::cout << "[1] Looking for configuration file: " << config_filename << "\n";
+        std::string config_path = find_config_file(config_filename);
+        std::cout << "  Found at: " << config_path << "\n";
+        
         canopen::ObjectDictionary dict(config_path);
         std::cout << "  " << COLOR_GREEN << "✓ Configuration loaded" << COLOR_RESET << "\n";
         std::cout << "  Device: " << dict.get_device_name() << "\n";
@@ -123,9 +160,12 @@ int main(int argc, char** argv) {
 
         // Create SDO client
         std::cout << "[2] Initializing SDO client...\n";
-        canopen::SDOClient sdo_client(dict.get_can_interface(), dict, dict.get_node_id());
 
-        if (!sdo_client.is_open()) {
+        // Create RealCANSocket for dependency injection
+        auto socket = std::make_shared<waveshare::RealCANSocket>(dict.get_can_interface(), 1000);
+        canopen::SDOClient sdo_client(socket, dict, dict.get_node_id());
+
+        if (!socket->is_open()) {
             std::cerr << COLOR_RED << "  ✗ Failed to open CAN socket" << COLOR_RESET << "\n";
             return 1;
         }

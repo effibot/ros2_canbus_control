@@ -38,7 +38,7 @@ if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lib/waveshare_cpp/CMakeLists.txt)
   add_subdirectory(lib/waveshare_cpp)
   set(WAVESHARE_FOUND TRUE)
   set(WAVESHARE_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/lib/waveshare_cpp/include)
-  set(WAVESHARE_LIBRARIES waveshare_cpp)
+  set(WAVESHARE_LIBRARIES waveshare_cpp waveshare_canopen)
 elseif(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lib/include/waveshare.hpp)
   set(WAVESHARE_FOUND TRUE)
   set(WAVESHARE_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/lib/include)
@@ -54,11 +54,6 @@ include_directories(
   include
   ${WAVESHARE_INCLUDE_DIRS}
 )
-
-# ==============================================================================
-# CANopen Core Library (Modular)
-# ==============================================================================
-add_subdirectory(src/canopen)
 
 # ==============================================================================
 # Lifecycle Node Executable
@@ -81,6 +76,22 @@ target_link_libraries(canopen_lifecycle_node
 ament_target_dependencies(canopen_lifecycle_node ${dependencies})
 
 # ==============================================================================
+# Test Scripts (Optional)
+# ==============================================================================
+add_executable(test_motor_communication
+  scripts/test_motor_communication.cpp
+)
+
+target_include_directories(test_motor_communication PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  ${WAVESHARE_INCLUDE_DIRS}
+)
+
+target_link_libraries(test_motor_communication
+  ${WAVESHARE_LIBRARIES}
+)
+
+# ==============================================================================
 # Testing (Modular with Catch2)
 # ==============================================================================
 if(BUILD_TESTING)
@@ -96,7 +107,7 @@ endif()
 # ==============================================================================
 # Installation
 # ==============================================================================
-install(TARGETS canopen_lifecycle_node canopen_core
+install(TARGETS canopen_lifecycle_node test_motor_communication
   DESTINATION lib/${PROJECT_NAME}
 )
 
