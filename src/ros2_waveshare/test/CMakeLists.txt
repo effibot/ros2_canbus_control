@@ -1,8 +1,5 @@
 # Test Configuration for ros2_waveshare CANopen stack
 # Uses Catch2 for unit and integration testing
-
-include(CTest)
-
 # Set CMake policy for linker search path behavior
 if(COMMAND cmake_policy)
     cmake_policy(SET CMP0003 NEW)

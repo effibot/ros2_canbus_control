@@ -102,7 +102,7 @@ void print_error_register(uint8_t error_reg) {
 // Helper to find config file in multiple locations
 std::string find_config_file(const std::string& filename) {
     namespace fs = std::filesystem;
-    
+
     // List of paths to search (in order of priority)
     std::vector<std::string> search_paths = {
         filename,  // Direct path if provided by user
@@ -112,22 +112,22 @@ std::string find_config_file(const std::string& filename) {
         "config/" + filename,  // Current directory
         "/home/ros/ws/ros2_canbus_control/src/ros2_waveshare/config/" + filename  // Absolute fallback
     };
-    
+
     for (const auto& path : search_paths) {
         if (fs::exists(path)) {
             return fs::absolute(path).string();
         }
     }
-    
-    throw std::runtime_error("Config file not found: " + filename + 
-                           "\nSearched paths:\n" + 
-                           [&]() {
-                               std::string paths;
-                               for (const auto& p : search_paths) {
-                                   paths += "  - " + p + "\n";
-                               }
-                               return paths;
-                           }());
+
+    throw std::runtime_error("Config file not found: " + filename +
+        "\nSearched paths:\n" +
+        [&]() {
+        std::string paths;
+        for (const auto& p : search_paths) {
+            paths += "  - " + p + "\n";
+        }
+        return paths;
+    } ());
 }
 
 int main(int argc, char** argv) {
@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
         std::cout << "[1] Looking for configuration file: " << config_filename << "\n";
         std::string config_path = find_config_file(config_filename);
         std::cout << "  Found at: " << config_path << "\n";
-        
+
         canopen::ObjectDictionary dict(config_path);
         std::cout << "  " << COLOR_GREEN << "✓ Configuration loaded" << COLOR_RESET << "\n";
         std::cout << "  Device: " << dict.get_device_name() << "\n";
