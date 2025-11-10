@@ -96,6 +96,7 @@ RUN apt-get update && sudo apt-get full-upgrade -y && apt-get install -y --no-in
     sudo \
     uncrustify \
     unzip \
+    usbutils \
     valgrind \
     vim \
     wget \
