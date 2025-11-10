@@ -78,18 +78,7 @@ ament_target_dependencies(canopen_lifecycle_node ${dependencies})
 # ==============================================================================
 # Test Scripts (Optional)
 # ==============================================================================
-add_executable(test_motor_communication
-  scripts/test_motor_communication.cpp
-)
-
-target_include_directories(test_motor_communication PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  ${WAVESHARE_INCLUDE_DIRS}
-)
-
-target_link_libraries(test_motor_communication
-  ${WAVESHARE_LIBRARIES}
-)
+# Old test files removed - use lib/waveshare_cpp/scripts/test_canopen_hardware instead
 
 # ==============================================================================
 # Testing (Modular with Catch2)
@@ -107,7 +96,7 @@ endif()
 # ==============================================================================
 # Installation
 # ==============================================================================
-install(TARGETS canopen_lifecycle_node test_motor_communication
+install(TARGETS canopen_lifecycle_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -298,6 +298,13 @@ ros_clean() {
     print_step "Workspace size after cleanup: $final_size"
 
     print_success "ROS workspace cleanup completed successfully."
+
+    # Resource .bashrc to clean any old environment variables
+    if [ -f "$HOME/.bashrc" ]; then
+        # shellcheck disable=SC1090
+        # shellcheck disable=SC1091
+        . "$HOME/.bashrc"
+    fi
     popd >/dev/null || return 1
 }
 
