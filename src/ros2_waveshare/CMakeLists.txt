@@ -18,8 +18,12 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
 find_package(rclcpp_components REQUIRED)
+find_package(rclcpp_action REQUIRED)
 find_package(diagnostic_updater REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
+find_package(ros2_waveshare_msgs REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
 # Dependencies list
@@ -27,8 +31,12 @@ set(dependencies
   rclcpp
   rclcpp_lifecycle
   rclcpp_components
+  rclcpp_action
   diagnostic_updater
   lifecycle_msgs
+  sensor_msgs
+  diagnostic_msgs
+  ros2_waveshare_msgs
 )
 
 # ==============================================================================
@@ -56,12 +64,21 @@ include_directories(
 )
 
 # ==============================================================================
+# Collect Source Files Automatically
+# ==============================================================================
+file(GLOB_RECURSE MOTOR_DRIVER_SOURCES
+  "src/motor_*.cpp"
+)
+
+file(GLOB LIFECYCLE_SOURCES
+  "src/canopen_lifecycle.cpp"
+  "src/canopen_lifecycle_main.cpp"
+)
+
+# ==============================================================================
 # Lifecycle Node Executable
 # ==============================================================================
-add_executable(canopen_lifecycle_node
-  src/canopen_lifecycle.cpp
-  src/canopen_lifecycle_main.cpp
-)
+add_executable(canopen_lifecycle_node ${LIFECYCLE_SOURCES})
 
 target_include_directories(canopen_lifecycle_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -74,6 +91,23 @@ target_link_libraries(canopen_lifecycle_node
 )
 
 ament_target_dependencies(canopen_lifecycle_node ${dependencies})
+
+# ==============================================================================
+# Motor Driver Node Executable
+# ==============================================================================
+add_executable(motor_driver_node ${MOTOR_DRIVER_SOURCES})
+
+target_include_directories(motor_driver_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${WAVESHARE_INCLUDE_DIRS}
+)
+
+target_link_libraries(motor_driver_node
+  ${WAVESHARE_LIBRARIES}
+)
+
+ament_target_dependencies(motor_driver_node ${dependencies})
 
 # ==============================================================================
 # Test Scripts (Optional)
@@ -96,7 +130,9 @@ endif()
 # ==============================================================================
 # Installation
 # ==============================================================================
-install(TARGETS canopen_lifecycle_node
+install(TARGETS 
+  canopen_lifecycle_node
+  motor_driver_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

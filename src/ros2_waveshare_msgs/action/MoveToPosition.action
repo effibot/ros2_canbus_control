@@ -1,0 +1,26 @@
+# Goal - Move to target position with trajectory control
+uint8 node_id                           # CANopen node ID (1-127)
+float64 target_position_rad             # Target position in radians
+float64 max_velocity_rad_s              # Maximum velocity (0 = use motor default)
+float64 max_acceleration_rad_s2         # Maximum acceleration (0 = use motor default)
+float64 position_tolerance_rad          # Position tolerance to consider target reached (default: 0.01 rad)
+float64 timeout_sec                     # Maximum time to reach target (default: 30.0 sec)
+
+---
+# Result
+bool success                            # True if target reached within tolerance
+string message                          # Error message if failed, or success confirmation
+float64 final_position_rad              # Final position achieved
+float64 position_error_rad              # Distance from target (final - target)
+float64 elapsed_time_sec                # Time taken to reach target
+bool target_reached                     # True if within tolerance
+bool timed_out                          # True if exceeded timeout
+
+---
+# Feedback - Progress toward target
+float64 current_position_rad            # Current position
+float64 current_velocity_rad_s          # Current velocity
+float64 distance_to_target_rad          # Remaining distance (signed)
+float32 progress_percent                # 0-100% (based on distance traveled)
+bool target_reached                     # True when within tolerance
+float64 elapsed_time_sec                # Time since goal started

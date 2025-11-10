@@ -1,0 +1,19 @@
+# Goal - Reset motor fault condition
+uint8 node_id                           # CANopen node ID (1-127)
+float64 timeout_sec                     # Maximum time for fault reset (default: 5.0)
+
+---
+# Result
+bool success                            # True if fault cleared
+string message                          # Error message if failed, or success confirmation
+uint8 error_register_before             # Error register before reset
+uint8 error_register_after              # Error register after reset
+string final_state                      # State after fault reset
+float64 elapsed_time_sec                # Time taken for reset
+
+---
+# Feedback - Progress through fault reset
+string current_state                    # Current CIA402 state
+uint16 statusword                       # Current statusword
+uint8 error_register                    # Current error register
+bool fault_cleared                      # True when fault bit cleared

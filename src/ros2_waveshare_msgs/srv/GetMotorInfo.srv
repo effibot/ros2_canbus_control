@@ -1,0 +1,25 @@
+# Request
+uint8 node_id                           # CANopen node ID (1-127)
+
+---
+# Response
+bool success                            # True if info retrieved successfully
+string message                          # Error message if failed
+
+# Motor identification
+string motor_name                       # Human-readable name
+uint32 device_type                      # CIA301 device type (0x1000)
+uint32 vendor_id                        # Vendor ID (0x1018.01)
+uint32 product_code                     # Product code (0x1018.02)
+uint32 revision_number                  # Revision number (0x1018.03)
+string serial_number                    # Serial number (0x1018.04)
+
+# Current state
+string state                            # Current CIA402 state
+uint16 statusword                       # Current statusword
+uint8 error_register                    # Current error register
+
+# Capabilities
+int8[] supported_operation_modes        # List of supported modes
+string firmware_version                 # Firmware version (if available)
+string hardware_version                 # Hardware version (if available)

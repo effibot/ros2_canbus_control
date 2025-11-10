@@ -1,0 +1,70 @@
+##############################################################################
+# Steering Motor Test Configuration
+#
+# Author: effibot (andrea.efficace1@gmail.com)
+# Date: 2025-11-10
+#
+# Description:
+#   Test configuration for single steering motor
+#   Use for development/testing of left steering motor only
+##############################################################################
+
+motor_driver:
+  ros__parameters:
+    can_interface: "vcan0"
+
+    motors:
+      motor_3:
+        node_id: 3
+        name: "steering_motor_left"
+        type: "steering"
+
+        config_file: "config/motor_config.json"
+
+        # Steering motor mechanical parameters (different from traction)
+        counts_per_revolution: 10000.0
+        gear_ratio: 100.0 # Higher gear ratio
+        torque_constant_nm_per_a: 0.03 # Different motor type
+
+        max_velocity_rad_s: 5.0 # Lower max velocity
+        max_torque_nm: 3.0
+        max_current_ma: 6000
+
+        feedback_rate_hz: 100.0
+        status_rate_hz: 10.0
+
+    pdo:
+      sync_rate_hz: 100.0
+      sync_enabled: true
+      tpdo_timeout_ms: 100
+      rpdo_retry_count: 3
+
+    publishing:
+      joint_state_rate_hz: 100.0
+      pdo_statistics_rate_hz: 1.0
+      diagnostics_rate_hz: 1.0
+
+    timeouts:
+      sdo_timeout_ms: 1000
+      state_transition_timeout_ms: 1000
+      action_default_timeout_sec: 5.0
+
+    diagnostics:
+      enable_extended_diagnostics: true
+      temperature_warning_c: 60.0
+      temperature_error_c: 80.0
+      voltage_min_warning_v: 22.0
+      voltage_max_warning_v: 28.0
+      current_warning_percent: 80.0
+
+    safety:
+      enable_watchdog: true
+      watchdog_timeout_ms: 500
+      auto_disable_on_fault: true
+      auto_recover_faults: false
+
+    logging:
+      log_sdo_transactions: true
+      log_pdo_statistics: true
+      log_state_transitions: true
+      verbose_startup: true

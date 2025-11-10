@@ -1,0 +1,18 @@
+# Goal - Enable motor with full state machine sequence
+uint8 node_id                           # CANopen node ID (1-127)
+float64 timeout_sec                     # Maximum time for full sequence (default: 10.0)
+
+---
+# Result
+bool success                            # True if motor reached OPERATION_ENABLED
+string message                          # Error message if failed, or success confirmation
+string final_state                      # Should be "OPERATION_ENABLED" on success
+uint16 final_statusword                 # Final statusword value
+float64 elapsed_time_sec                # Time taken for sequence
+
+---
+# Feedback - Progress through state machine
+string current_state                    # Current CIA402 state
+uint16 statusword                       # Current statusword
+float32 progress_percent                # 0-100% (based on state transitions)
+string transition_name                  # Current transition being executed

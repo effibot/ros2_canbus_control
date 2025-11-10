@@ -1,0 +1,30 @@
+# Request
+uint8 node_id                           # CANopen node ID (1-127)
+
+# Lookup by name (from object dictionary)
+string object_name                      # e.g., "statusword", "position_actual_value"
+
+# OR lookup by direct index (if object_name is empty)
+uint16 index                            # Object dictionary index (e.g., 0x6041)
+uint8 subindex                          # Object dictionary subindex (default: 0)
+
+---
+# Response
+bool success                            # True if read successful
+string message                          # Error message if failed, or success confirmation
+
+# Raw data
+uint8[] data                            # Raw bytes read from device
+
+# Parsed values (based on detected type)
+uint8 value_u8
+uint16 value_u16
+uint32 value_u32
+int8 value_i8
+int16 value_i16
+int32 value_i32
+string value_string                     # For string types
+
+# Metadata
+string detected_type                    # "uint16", "int32", etc. (from object dictionary)
+uint8 data_length                       # Number of bytes read
