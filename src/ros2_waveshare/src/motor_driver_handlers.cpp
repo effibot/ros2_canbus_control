@@ -18,39 +18,9 @@
  */
 
 #include "ros2_waveshare/motor_driver_node.hpp"
+#include <canopen/cia402_constants.hpp>
 
 namespace ros2_waveshare {
-
-// =============================================================================
-// Initialization Methods
-// =============================================================================
-
-    void MotorDriverNode::initialize_pdo_manager() {
-        // TODO: Implement PDO manager initialization
-        RCLCPP_INFO(this->get_logger(), "PDO manager initialization - TODO");
-    }
-
-    void MotorDriverNode::setup_publishers() {
-        // TODO: Implement publishers setup
-        RCLCPP_INFO(this->get_logger(), "Publishers setup - TODO");
-    }
-
-    void MotorDriverNode::setup_timers() {
-        // TODO: Implement timers setup
-        RCLCPP_INFO(this->get_logger(), "Timers setup - TODO");
-    }
-
-// =============================================================================
-// Command Callback
-// =============================================================================
-
-    void MotorDriverNode::on_motor_command(
-        uint8_t node_id,
-        std::shared_ptr<MotorCommand> msg) {
-        // TODO: Implement motor command handler
-        RCLCPP_INFO(this->get_logger(),
-            "Motor command received for node_id=%d - TODO", node_id);
-    }
 
 // =============================================================================
 // Service Handlers
@@ -99,18 +69,20 @@ namespace ros2_waveshare {
             response->data = data;
             response->data_length = data.size();
 
-            // Parse data based on size
+            // Parse data using ObjectDictionary helpers based on size
+            auto& dict = motor->get_dictionary();
+
             if (data.size() == 1) {
-                response->value_u8 = data[0];
-                response->value_i8 = static_cast<int8_t>(data[0]);
+                response->value_u8 = dict.from_raw<uint8_t>(data);
+                response->value_i8 = dict.from_raw<int8_t>(data);
                 response->detected_type = "uint8";
             } else if (data.size() == 2) {
-                response->value_u16 = (data[1] << 8) | data[0];
-                response->value_i16 = static_cast<int16_t>(response->value_u16);
+                response->value_u16 = dict.from_raw<uint16_t>(data);
+                response->value_i16 = dict.from_raw<int16_t>(data);
                 response->detected_type = "uint16";
             } else if (data.size() == 4) {
-                response->value_u32 = (data[3] << 24) | (data[2] << 16) | (data[1] << 8) | data[0];
-                response->value_i32 = static_cast<int32_t>(response->value_u32);
+                response->value_u32 = dict.from_raw<uint32_t>(data);
+                response->value_i32 = dict.from_raw<int32_t>(data);
                 response->detected_type = "uint32";
             } else {
                 response->detected_type = "raw_bytes";
@@ -129,33 +101,312 @@ namespace ros2_waveshare {
         uint8_t node_id,
         std::shared_ptr<SDOWrite::Request> request,
         std::shared_ptr<SDOWrite::Response> response) {
-        // TODO: Implement SDO write handler
-        response->success = false;
-        response->message = "SDO write not yet implemented";
-        RCLCPP_WARN(this->get_logger(),
-            "SDO write service called for node_id=%d - TODO", node_id);
+        auto motor = get_motor(node_id);
+        if (!motor) {
+            response->success = false;
+            response->message = "Motor with node_id " + std::to_string(node_id) + " not found";
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+            return;
+        }
+
+        auto sdo_client = motor->get_sdo_client();
+        if (!sdo_client) {
+            response->success = false;
+            response->message = "SDO client not initialized for motor " + motor->get_name();
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+            return;
+        }
+
+        try {
+            std::vector<uint8_t> data_to_write;
+            auto& dict = motor->get_dictionary();
+
+            // Determine data to write based on value_type or infer from non-zero values
+            if (!request->value_type.empty()) {
+                // Explicit type specified - use ObjectDictionary helpers
+                if (request->value_type == "uint8") {
+                    data_to_write = dict.to_raw(request->value_u8);
+                } else if (request->value_type == "uint16") {
+                    data_to_write = dict.to_raw(request->value_u16);
+                } else if (request->value_type == "uint32") {
+                    data_to_write = dict.to_raw(request->value_u32);
+                } else if (request->value_type == "int8") {
+                    data_to_write = dict.to_raw(request->value_i8);
+                } else if (request->value_type == "int16") {
+                    data_to_write = dict.to_raw(request->value_i16);
+                } else if (request->value_type == "int32") {
+                    data_to_write = dict.to_raw(request->value_i32);
+                } else if (request->value_type == "bytes") {
+                    data_to_write = request->value_bytes;
+                } else {
+                    response->success = false;
+                    response->message = "Unknown value_type: " + request->value_type;
+                    RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+                    return;
+                }
+            } else if (!request->value_bytes.empty()) {
+                // Raw bytes provided
+                data_to_write = request->value_bytes;
+            } else {
+                // Infer type from first non-zero value (prioritize larger types)
+                if (request->value_u32 != 0 || request->value_i32 != 0) {
+                    data_to_write = (request->value_u32 != 0) ?
+                        dict.to_raw(request->value_u32) :
+                        dict.to_raw(request->value_i32);
+                } else if (request->value_u16 != 0 || request->value_i16 != 0) {
+                    data_to_write = (request->value_u16 != 0) ?
+                        dict.to_raw(request->value_u16) :
+                        dict.to_raw(request->value_i16);
+                } else if (request->value_u8 != 0 || request->value_i8 != 0) {
+                    data_to_write = (request->value_u8 != 0) ?
+                        dict.to_raw(request->value_u8) :
+                        dict.to_raw(request->value_i8);
+                } else {
+                    response->success = false;
+                    response->message = "No value provided for SDO write";
+                    RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+                    return;
+                }
+            }
+
+            // Perform the write using object name
+            if (!request->object_name.empty()) {
+                bool write_success = sdo_client->write_object(
+                    request->object_name,
+                    data_to_write,
+                    std::chrono::milliseconds(1000)
+                );
+
+                if (write_success) {
+                    response->success = true;
+                    response->message = "SDO write successful";
+                    response->verified = false;  // Not implemented yet
+
+                    RCLCPP_INFO(this->get_logger(),
+                        "SDO write '%s' to node %d: %zu bytes written",
+                        request->object_name.c_str(), node_id, data_to_write.size());
+                } else {
+                    response->success = false;
+                    response->message = "SDO write failed (timeout or NAK)";
+                    RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+                }
+            } else {
+                // Direct index/subindex not supported yet
+                response->success = false;
+                response->message =
+                    "Direct index/subindex write not supported. Use object_name instead.";
+                RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
+            }
+
+        } catch (const std::exception& e) {
+            response->success = false;
+            response->message = std::string("SDO write failed: ") + e.what();
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+        }
     }
 
     void MotorDriverNode::handle_set_operation_mode(
         uint8_t node_id,
         std::shared_ptr<SetOperationMode::Request> request,
         std::shared_ptr<SetOperationMode::Response> response) {
-        // TODO: Implement set operation mode handler
-        response->success = false;
-        response->message = "Set operation mode not yet implemented";
-        RCLCPP_WARN(this->get_logger(),
-            "Set operation mode service called for node_id=%d - TODO", node_id);
+        auto motor = get_motor(node_id);
+        if (!motor) {
+            response->success = false;
+            response->message = "Motor with node_id " + std::to_string(node_id) + " not found";
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+            return;
+        }
+
+        auto sdo_client = motor->get_sdo_client();
+        if (!sdo_client) {
+            response->success = false;
+            response->message = "SDO client not initialized for motor " + motor->get_name();
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+            return;
+        }
+
+        try {
+            // First, read the current mode from Modes of Operation Display (0x6061)
+            std::vector<uint8_t> current_mode_data = sdo_client->read_object(
+                "modes_of_operation_display",
+                std::chrono::milliseconds(1000)
+            );
+
+            int8_t previous_mode = 0;
+            if (!current_mode_data.empty()) {
+                previous_mode = static_cast<int8_t>(current_mode_data[0]);
+            }
+            response->previous_mode = previous_mode;
+
+            // Write the new mode to Modes of Operation (0x6060)
+            std::vector<uint8_t> mode_data;
+            mode_data.push_back(static_cast<uint8_t>(request->operation_mode));
+
+            bool write_success = sdo_client->write_object(
+                "modes_of_operation",
+                mode_data,
+                std::chrono::milliseconds(1000)
+            );
+
+            if (!write_success) {
+                response->success = false;
+                response->message = "Failed to write operation mode (timeout or NAK)";
+                response->current_mode = previous_mode;
+                RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+                return;
+            }
+
+            // Verify the mode was set by reading Modes of Operation Display
+            std::vector<uint8_t> verify_mode_data = sdo_client->read_object(
+                "modes_of_operation_display",
+                std::chrono::milliseconds(1000)
+            );
+
+            int8_t actual_mode = 0;
+            if (!verify_mode_data.empty()) {
+                actual_mode = static_cast<int8_t>(verify_mode_data[0]);
+            }
+            response->current_mode = actual_mode;
+
+            // Check if mode was successfully set
+            if (actual_mode == request->operation_mode) {
+                response->success = true;
+                response->message = "Operation mode set and verified successfully";
+
+                RCLCPP_INFO(this->get_logger(),
+                    "Motor %d operation mode changed: %d -> %d (%s)",
+                    node_id, previous_mode, actual_mode,
+                    canopen::cia402::get_mode_description(actual_mode));
+            } else {
+                response->success = false;
+                response->message = "Mode verification failed: requested " +
+                    std::to_string(request->operation_mode) +
+                    " (" + canopen::cia402::get_mode_description(request->operation_mode) + ")" +
+                    " but got " + std::to_string(actual_mode) +
+                    " (" + canopen::cia402::get_mode_description(actual_mode) + ")";
+                RCLCPP_WARN(this->get_logger(), "%s", response->message.c_str());
+            }
+
+        } catch (const std::exception& e) {
+            response->success = false;
+            response->message = std::string("Set operation mode failed: ") + e.what();
+            response->current_mode = response->previous_mode;
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+        }
     }
 
     void MotorDriverNode::handle_get_motor_info(
         uint8_t node_id,
         std::shared_ptr<GetMotorInfo::Request> request,
         std::shared_ptr<GetMotorInfo::Response> response) {
-        // TODO: Implement get motor info handler
-        response->success = false;
-        response->message = "Get motor info not yet implemented";
-        RCLCPP_WARN(this->get_logger(),
-            "Get motor info service called for node_id=%d - TODO", node_id);
+        auto motor = get_motor(node_id);
+        if (!motor) {
+            response->success = false;
+            response->message = "Motor with node_id " + std::to_string(node_id) + " not found";
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+            return;
+        }
+
+        auto sdo_client = motor->get_sdo_client();
+        if (!sdo_client) {
+            response->success = false;
+            response->message = "SDO client not initialized for motor " + motor->get_name();
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+            return;
+        }
+
+        try {
+            // Basic motor identification
+            response->motor_name = motor->get_name();
+            auto& dict = motor->get_dictionary();
+
+            // Read device type (0x1000)
+            try {
+                auto device_type_data = sdo_client->read_object(
+                    "device_type",
+                    std::chrono::milliseconds(500)
+                );
+                response->device_type = dict.from_raw<uint32_t>(device_type_data);
+            } catch (const std::exception& e) {
+                RCLCPP_WARN(this->get_logger(), "Failed to read device type: %s", e.what());
+            }
+
+            // Read statusword (0x6041)
+            try {
+                auto statusword_data = sdo_client->read_object(
+                    "statusword",
+                    std::chrono::milliseconds(500)
+                );
+                response->statusword = dict.from_raw<uint16_t>(statusword_data);
+
+                // Decode CIA 402 state from statusword using waveshare_cpp helper
+                auto state = canopen::cia402::decode_statusword(response->statusword);
+                response->state = canopen::cia402::get_state_description(state);
+            } catch (const std::exception& e) {
+                RCLCPP_WARN(this->get_logger(), "Failed to read statusword: %s", e.what());
+            }
+
+            // Read error register (0x1001)
+            try {
+                auto error_reg_data = sdo_client->read_object(
+                    "error_register",
+                    std::chrono::milliseconds(500)
+                );
+                response->error_register = dict.from_raw<uint8_t>(error_reg_data);
+            } catch (const std::exception& e) {
+                RCLCPP_WARN(this->get_logger(), "Failed to read error register: %s", e.what());
+            }
+
+            // Read vendor ID (0x1018.01)
+            try {
+                auto vendor_data = sdo_client->read_object(
+                    "identity_vendor_id",
+                    std::chrono::milliseconds(500)
+                );
+                response->vendor_id = dict.from_raw<uint32_t>(vendor_data);
+            } catch (const std::exception& e) {
+                RCLCPP_DEBUG(this->get_logger(), "Failed to read vendor ID: %s", e.what());
+            }
+
+            // Read product code (0x1018.02)
+            try {
+                auto product_data = sdo_client->read_object(
+                    "identity_product_code",
+                    std::chrono::milliseconds(500)
+                );
+                response->product_code = dict.from_raw<uint32_t>(product_data);
+            } catch (const std::exception& e) {
+                RCLCPP_DEBUG(this->get_logger(), "Failed to read product code: %s", e.what());
+            }
+
+            // Read revision number (0x1018.03)
+            try {
+                auto revision_data = sdo_client->read_object(
+                    "identity_revision_number",
+                    std::chrono::milliseconds(500)
+                );
+                response->revision_number = dict.from_raw<uint32_t>(revision_data);
+            } catch (const std::exception& e) {
+                RCLCPP_DEBUG(this->get_logger(), "Failed to read revision number: %s", e.what());
+            }
+
+            // Supported operation modes - commonly supported by most motors
+            // This is a simplified list; ideally should be read from object dictionary
+            response->supported_operation_modes = {1, 3, 8, 9};  // PP, PV, CSP, CSV
+
+            response->success = true;
+            response->message = "Motor info retrieved successfully";
+
+            RCLCPP_INFO(this->get_logger(),
+                "Motor info for %s (node %d): state=%s, statusword=0x%04X, device_type=0x%08X",
+                response->motor_name.c_str(), node_id, response->state.c_str(),
+                response->statusword, response->device_type);
+
+        } catch (const std::exception& e) {
+            response->success = false;
+            response->message = std::string("Get motor info failed: ") + e.what();
+            RCLCPP_ERROR(this->get_logger(), "%s", response->message.c_str());
+        }
     }
 
 // =============================================================================

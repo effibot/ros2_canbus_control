@@ -401,6 +401,120 @@ namespace ros2_waveshare {
     }
 
 // =============================================================================
+// PDO Manager Initialization
+// =============================================================================
+
+    void MotorDriverNode::initialize_pdo_manager() {
+        RCLCPP_INFO(this->get_logger(), "Initializing PDO manager...");
+
+        try {
+            // Create PDO manager with shared CAN socket
+            pdo_manager_ = std::make_unique<canopen::PDOManager>(can_socket_);
+
+            // Register TPDO callbacks for each motor
+            for (const auto& [node_id, motor] : motors_) {
+                // TPDO1: Statusword + Position feedback
+                pdo_manager_->register_tpdo1_callback(node_id,
+                    [this, node_id](const can_frame& frame) {
+                        this->on_tpdo1_received(node_id, frame);
+                    });
+
+                // TPDO2: Velocity + Current feedback
+                pdo_manager_->register_tpdo2_callback(node_id,
+                    [this, node_id](const can_frame& frame) {
+                        this->on_tpdo2_received(node_id, frame);
+                    });
+
+                RCLCPP_INFO(this->get_logger(),
+                    "Registered PDO callbacks for motor %d (%s)",
+                    node_id, motor->get_name().c_str());
+            }
+
+            // Start PDO manager (opens socket and starts receive thread)
+            if (!pdo_manager_->start()) {
+                throw std::runtime_error("Failed to start PDO manager");
+            }
+
+            RCLCPP_INFO(this->get_logger(),
+                "PDO manager initialized successfully on %s",
+                pdo_manager_->get_interface().c_str());
+
+        } catch (const std::exception& e) {
+            throw std::runtime_error(
+                std::string("Failed to initialize PDO manager: ") + e.what());
+        }
+    }
+
+// =============================================================================
+// Publishers Setup
+// =============================================================================
+
+    void MotorDriverNode::setup_publishers() {
+        RCLCPP_INFO(this->get_logger(), "Setting up combined publishers...");
+
+        // JointState publisher (standard ROS2 message for robot_state_publisher)
+        pub_joint_states_ = this->create_publisher<JointState>(
+            "/joint_states",
+            rclcpp::QoS(10));
+
+        // PDO statistics publisher
+        pub_pdo_stats_ = this->create_publisher<PDOStatistics>(
+            "/motors/pdo_statistics",
+            rclcpp::QoS(10));
+
+        // Diagnostics publisher (standard ROS2 diagnostic framework)
+        pub_diagnostics_ = this->create_publisher<DiagnosticArray>(
+            "/diagnostics",
+            rclcpp::QoS(10));
+
+        RCLCPP_INFO(this->get_logger(), "Combined publishers created");
+    }
+
+// =============================================================================
+// Timers Setup
+// =============================================================================
+
+    void MotorDriverNode::setup_timers() {
+        RCLCPP_INFO(this->get_logger(), "Setting up timers...");
+
+        // SYNC timer (sends SYNC message to synchronize PDO transmission)
+        if (sync_enabled_) {
+            auto sync_period = std::chrono::duration<double>(1.0 / sync_rate_hz_);
+            timer_sync_ = this->create_wall_timer(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(sync_period),
+                [this]() {
+                    this->send_sync_timer_callback();
+                });
+            RCLCPP_INFO(this->get_logger(),
+                "SYNC timer started at %.1f Hz", sync_rate_hz_);
+        } else {
+            RCLCPP_INFO(this->get_logger(), "SYNC disabled by configuration");
+        }
+
+        // JointState publisher timer
+        auto joint_state_period = std::chrono::duration<double>(1.0 / joint_state_rate_hz_);
+        timer_joint_state_ = this->create_wall_timer(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(joint_state_period),
+            [this]() {
+                this->publish_joint_state_callback();
+            });
+        RCLCPP_INFO(this->get_logger(),
+            "JointState timer started at %.1f Hz", joint_state_rate_hz_);
+
+        // Diagnostics timer
+        auto diagnostics_period = std::chrono::duration<double>(1.0 / diagnostics_rate_hz_);
+        timer_diagnostics_ = this->create_wall_timer(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(diagnostics_period),
+            [this]() {
+                this->publish_diagnostics_callback();
+            });
+        RCLCPP_INFO(this->get_logger(),
+            "Diagnostics timer started at %.1f Hz", diagnostics_rate_hz_);
+
+        RCLCPP_INFO(this->get_logger(), "All timers configured");
+    }
+
+// =============================================================================
 // Helper Methods
 // =============================================================================
 

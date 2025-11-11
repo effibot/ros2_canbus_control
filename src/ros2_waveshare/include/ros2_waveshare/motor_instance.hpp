@@ -44,6 +44,7 @@
 // Waveshare CANopen library
 #include <canopen/sdo_client.hpp>
 #include <canopen/cia402_fsm.hpp>
+#include <canopen/cia402_constants.hpp>
 #include <canopen/object_dictionary.hpp>
 
 namespace ros2_waveshare {
@@ -269,6 +270,120 @@ namespace ros2_waveshare {
             uint32_t get_tpdo_missed_count() const { return tpdo_missed_count_.load(); }
 
             // =========================================================================
+            // Motor State Updates (from PDO data)
+            // =========================================================================
+
+            /**
+             * @brief Update statusword from TPDO1
+             */
+            void update_statusword(uint16_t statusword) {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                statusword_ = statusword;
+            }
+
+            /**
+             * @brief Get current statusword
+             */
+            uint16_t get_statusword() const {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                return statusword_;
+            }
+
+            /**
+             * @brief Update position from TPDO1 (encoder counts)
+             */
+            void update_position(int32_t position_counts) {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                position_counts_ = position_counts;
+            }
+
+            /**
+             * @brief Get current position (encoder counts)
+             */
+            int32_t get_position() const {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                return position_counts_;
+            }
+
+            /**
+             * @brief Update velocity from TPDO2 (counts/sec)
+             */
+            void update_velocity(int32_t velocity_counts_per_sec) {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                velocity_counts_per_sec_ = velocity_counts_per_sec;
+            }
+
+            /**
+             * @brief Get current velocity (counts/sec)
+             */
+            int32_t get_velocity() const {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                return velocity_counts_per_sec_;
+            }
+
+            /**
+             * @brief Update current from TPDO2 (milliamps)
+             */
+            void update_current(int16_t current_ma) {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                current_ma_ = current_ma;
+            }
+
+            /**
+             * @brief Get current (milliamps)
+             */
+            int16_t get_current() const {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                return current_ma_;
+            }
+
+            /**
+             * @brief Update operation mode
+             */
+            void update_operation_mode(int8_t mode) {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                operation_mode_ = mode;
+            }
+
+            /**
+             * @brief Get current operation mode
+             */
+            int8_t get_operation_mode() const {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                return operation_mode_;
+            }
+
+            /**
+             * @brief Update last TPDO1 receive time
+             */
+            void update_last_tpdo1_time(const rclcpp::Time& time) {
+                last_tpdo1_ros_time_ = time;
+            }
+
+            /**
+             * @brief Update last TPDO2 receive time
+             */
+            void update_last_tpdo2_time(const rclcpp::Time& time) {
+                last_tpdo2_ros_time_ = time;
+            }
+
+            /**
+             * @brief Get previous state for change detection
+             */
+            canopen::cia402::State get_previous_state() const {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                return previous_state_;
+            }
+
+            /**
+             * @brief Set previous state for change detection
+             */
+            void set_previous_state(canopen::cia402::State state) {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                previous_state_ = state;
+            }
+
+            // =========================================================================
             // ROS2 Publishers
             // =========================================================================
 
@@ -357,6 +472,17 @@ namespace ros2_waveshare {
             // State tracking
             std::atomic<bool> initialized_{false};
             std::atomic<bool> enabled_{false};
+
+            // Motor state data (protected by mutex)
+            mutable std::mutex state_mutex_;
+            uint16_t statusword_{0};
+            int32_t position_counts_{0};
+            int32_t velocity_counts_per_sec_{0};
+            int16_t current_ma_{0};
+            int8_t operation_mode_{0};
+            canopen::cia402::State previous_state_{canopen::cia402::State::NOT_READY_TO_SWITCH_ON};
+            rclcpp::Time last_tpdo1_ros_time_;
+            rclcpp::Time last_tpdo2_ros_time_;
 
             // Latest feedback data (protected by mutex)
             mutable std::mutex feedback_mutex_;
