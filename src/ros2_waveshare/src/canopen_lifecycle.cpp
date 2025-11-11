@@ -118,6 +118,22 @@ namespace ros2_waveshare {
 
             return LifecycleNodeInterface::CallbackReturn::SUCCESS;
         }
+        catch (const DeviceException& e) {
+            // Enhanced error handling for device-specific issues
+            if (e.status() == Status::DBUSY) {
+                RCLCPP_ERROR(get_logger(),
+                    "Activation failed: USB device '%s' is already in use by another process",
+                    bridge_config_->usb_device_path.c_str());
+                RCLCPP_ERROR(get_logger(),
+                    "  Check if another bridge instance is running: ros2 lifecycle list");
+                RCLCPP_ERROR(get_logger(), "  Or use 'fuser %s' to identify the process",
+                    bridge_config_->usb_device_path.c_str());
+            } else {
+                RCLCPP_ERROR(get_logger(), "Activation failed (Device Error): %s", e.what());
+            }
+            socketcan_bridge_.reset();
+            return LifecycleNodeInterface::CallbackReturn::FAILURE;
+        }
         catch (const std::exception& e) {
             RCLCPP_ERROR(get_logger(), "Activation failed: %s", e.what());
             socketcan_bridge_.reset();
