@@ -15,20 +15,19 @@
 #include "rclcpp/rclcpp.hpp"
 #include "ros2_waveshare/velocity_converter_node.hpp"
 
-int main(int argc, char ** argv)
-{
-  rclcpp::init(argc, argv);
+int main(int argc, char** argv) {
+    rclcpp::init(argc, argv);
 
-  try {
-    auto node = std::make_shared<ros2_waveshare::VelocityConverterNode>();
-    rclcpp::spin(node);
-  } catch (const std::exception & ex) {
-    RCLCPP_ERROR(rclcpp::get_logger("velocity_converter_main"),
-                 "Exception in velocity_converter_node: %s", ex.what());
+    try {
+        auto node = std::make_shared<ros2_waveshare::VelocityConverterNode>();
+        rclcpp::spin(node);
+    } catch (const std::exception& ex) {
+        RCLCPP_ERROR(rclcpp::get_logger("velocity_converter_main"),
+            "Exception in velocity_converter_node: %s", ex.what());
+        rclcpp::shutdown();
+        return 1;
+    }
+
     rclcpp::shutdown();
-    return 1;
-  }
-
-  rclcpp::shutdown();
-  return 0;
+    return 0;
 }
