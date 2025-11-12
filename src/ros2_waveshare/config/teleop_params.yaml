@@ -1,0 +1,27 @@
+# Teleop Velocity Node Parameters
+# ================================
+#
+# Simple keyboard teleoperation for velocity control
+#
+# Keyboard Controls:
+#   ↑ (Up Arrow)    : Increase velocity by accel_step
+#   ↓ (Down Arrow)  : Decrease velocity by accel_step
+#   0 (Zero Key)    : Ramp to zero velocity
+#   ESC             : Shutdown (safe stop)
+#
+# Usage:
+#   ros2 run ros2_waveshare teleop_velocity_node --ros-args --params-file config/teleop_params.yaml
+
+teleop_velocity:
+  ros__parameters:
+    # Maximum velocity magnitude (m/s)
+    # Robot will not exceed ±max_velocity
+    max_velocity: 1.0
+
+    # Velocity change per keypress (m/s)
+    # Each arrow key press changes velocity by this amount
+    accel_step: 0.1
+
+    # Publishing frequency (Hz)
+    # cmd_vel messages are published at this rate
+    publish_rate: 20.0

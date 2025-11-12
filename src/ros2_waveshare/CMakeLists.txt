@@ -25,6 +25,7 @@ find_package(sensor_msgs REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(ros2_waveshare_msgs REQUIRED)
 find_package(nlohmann_json REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 # Dependencies list
 set(dependencies
@@ -37,6 +38,7 @@ set(dependencies
   sensor_msgs
   diagnostic_msgs
   ros2_waveshare_msgs
+  geometry_msgs
 )
 
 # ==============================================================================
@@ -72,6 +74,9 @@ file(GLOB_RECURSE MOTOR_DRIVER_SOURCES
 
 # Exclude lifecycle sources from motor driver sources
 list(FILTER MOTOR_DRIVER_SOURCES EXCLUDE REGEX ".*canopen_lifecycle.*")
+
+# Exclude teleop node sources from motor driver sources
+list(FILTER MOTOR_DRIVER_SOURCES EXCLUDE REGEX ".*teleop_velocity.*")
 
 file(GLOB LIFECYCLE_SOURCES
   "src/canopen_lifecycle.cpp"
@@ -113,6 +118,24 @@ target_link_libraries(motor_driver_node
 ament_target_dependencies(motor_driver_node ${dependencies})
 
 # ==============================================================================
+# Teleop Velocity Node Executable
+# ==============================================================================
+add_executable(teleop_velocity_node
+  src/teleop_velocity_node.cpp
+  src/teleop_velocity_main.cpp
+)
+
+target_include_directories(teleop_velocity_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+ament_target_dependencies(teleop_velocity_node
+  rclcpp
+  geometry_msgs
+)
+
+# ==============================================================================
 # Test Scripts (Optional)
 # ==============================================================================
 # Old test files removed - use lib/waveshare_cpp/scripts/test_canopen_hardware instead
@@ -136,6 +159,7 @@ endif()
 install(TARGETS 
   canopen_lifecycle_node
   motor_driver_node
+  teleop_velocity_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
