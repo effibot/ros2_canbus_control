@@ -1,0 +1,83 @@
+---
+title: Plugin Architecture for Dynamic Models
+config:
+    theme: forest
+---
+graph TB
+    subgraph "Velocity Converter Node"
+        VC[VelocityConverterNode]
+        LOADER[Plugin Loader<br/>pluginlib::ClassLoader]
+    end
+
+    subgraph "Plugin Interface (Abstract Base)"
+        BASE[DynamicModelInterface<br/>Pure Virtual Class]
+        
+        subgraph "Interface Methods"
+            INIT[initialize<br/>config, params]
+            UPDATE[update<br/>cmd_vel, feedback]
+            COMPUTE[compute_control<br/>returns MotorCommand]
+            RESET[reset<br/>clear state]
+            SHUTDOWN[shutdown<br/>safe stop]
+        end
+    end
+
+    subgraph "Plugin Implementations"
+        subgraph "Single Motor Model"
+            SINGLE[SingleMotorModel]
+            S_STATE[State:<br/>- target_velocity<br/>- current_velocity<br/>- position_error<br/>- integral_error]
+            S_PID[PID Controller:<br/>Kp, Ki, Kd]
+            S_LIMIT[Limits:<br/>- max_velocity<br/>- max_acceleration]
+        end
+
+        subgraph "Differential Drive Model (Future)"
+            DIFF[DifferentialDriveModel]
+            D_STATE[State:<br/>- left/right velocities<br/>- wheel_base<br/>- odometry]
+            D_KINE[Kinematics:<br/>Twist → Wheel Velocities]
+        end
+
+        subgraph "Ackermann Model (Future)"
+            ACKER[AckermannModel]
+            A_STATE[State:<br/>- steering_angle<br/>- wheel_velocities<br/>- vehicle dynamics]
+            A_KINE[Kinematics:<br/>Ackermann Geometry]
+        end
+    end
+
+    %% Connections
+    VC -->|Creates| LOADER
+    LOADER -->|Loads Plugin| BASE
+    BASE -.->|Implements| SINGLE
+    BASE -.->|Implements| DIFF
+    BASE -.->|Implements| ACKER
+
+    BASE --> INIT
+    BASE --> UPDATE
+    BASE --> COMPUTE
+    BASE --> RESET
+    BASE --> SHUTDOWN
+
+    SINGLE --> S_STATE
+    SINGLE --> S_PID
+    SINGLE --> S_LIMIT
+
+    DIFF --> D_STATE
+    DIFF --> D_KINE
+
+    ACKER --> A_STATE
+    ACKER --> A_KINE
+
+    %% Plugin XML Registration
+    XML[plugin_description.xml]
+    XML -.->|Registers| SINGLE
+    XML -.->|Registers| DIFF
+    XML -.->|Registers| ACKER
+
+    %% Styling
+    classDef nodeClass fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef interfaceClass fill:#fff9c4,stroke:#f57f17,stroke-width:3px
+    classDef pluginClass fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef stateClass fill:#e8f5e9,stroke:#1b5e20,stroke-width:1px
+
+    class VC,LOADER nodeClass
+    class BASE,INIT,UPDATE,COMPUTE,RESET,SHUTDOWN interfaceClass
+    class SINGLE,DIFF,ACKER pluginClass
+    class S_STATE,S_PID,S_LIMIT,D_STATE,D_KINE,A_STATE,A_KINE stateClass

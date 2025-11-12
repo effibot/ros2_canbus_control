@@ -18,6 +18,7 @@
  */
 
 #include "ros2_waveshare/motor_driver_node.hpp"
+#include "ros2_waveshare/motor_driver_action_helpers.hpp"
 #include <canopen/cia402_constants.hpp>
 
 namespace ros2_waveshare {
@@ -435,15 +436,151 @@ namespace ros2_waveshare {
     void MotorDriverNode::handle_enable_accepted(
         uint8_t node_id,
         std::shared_ptr<EnableMotorGoalHandle> goal_handle) {
-        // TODO: Implement enable motor accepted handler
         RCLCPP_INFO(this->get_logger(),
-            "Enable motor accepted for node_id=%d - TODO", node_id);
+            "Enable motor accepted for node_id=%d, starting execution thread", node_id);
 
-        // For now, just succeed immediately
+        // Spawn execution thread (non-blocking)
+        std::thread{std::bind(&MotorDriverNode::execute_enable, this, node_id,
+            goal_handle)}.detach();
+    }
+
+    void MotorDriverNode::execute_enable(
+        uint8_t node_id,
+        std::shared_ptr<EnableMotorGoalHandle> goal_handle) {
+
+        const auto goal = goal_handle->get_goal();
         auto result = std::make_shared<EnableMotor::Result>();
-        result->success = false;
-        result->message = "Enable motor not yet implemented";
-        goal_handle->succeed(result);
+        auto feedback = std::make_shared<EnableMotor::Feedback>();
+
+        const auto start_time = this->now();
+        const auto timeout_duration = rclcpp::Duration::from_seconds(
+            goal->timeout_sec > 0 ? goal->timeout_sec : 10.0
+        );
+
+        RCLCPP_INFO(this->get_logger(),
+            "Executing enable motor for node_id=%d with timeout=%.1fs",
+            node_id, timeout_duration.seconds());
+
+        // Validate motor instance
+        auto motor = get_motor(node_id);
+        if (!motor) {
+            result->success = false;
+            result->message = "Invalid node_id: " + std::to_string(node_id);
+            result->final_state = "UNKNOWN";
+            result->elapsed_time_sec = (this->now() - start_time).seconds();
+            goal_handle->abort(result);
+            RCLCPP_ERROR(this->get_logger(), "%s", result->message.c_str());
+            return;
+        }
+
+        auto fsm = motor->get_fsm();
+
+        // Initial state check
+        feedback->progress_percent = 0.0;
+        feedback->transition_name = "Initial state check";
+        update_fsm_feedback(motor, feedback, true);
+        goal_handle->publish_feedback(feedback);
+
+        RCLCPP_INFO(this->get_logger(),
+            "Motor %d initial state: %s (statusword=0x%04X)",
+            node_id, feedback->current_state.c_str(), feedback->statusword);
+
+        // Transition 1: Shutdown -> READY_TO_SWITCH_ON
+        if (should_abort_action<EnableMotor>(goal_handle, start_time, timeout_duration,
+            "Enable motor")) {
+            return;
+        }
+
+        if (!execute_state_transition(node_id, motor, feedback, goal_handle,
+            "Shutdown (transition to READY_TO_SWITCH_ON)", 20.0,
+            [](auto fsm) {
+                return fsm->shutdown();
+            })) {
+            result->success = false;
+            result->message = "Failed at step: Shutdown";
+            result->final_state = feedback->current_state;
+            result->final_statusword = feedback->statusword;
+            result->elapsed_time_sec = (this->now() - start_time).seconds();
+            goal_handle->abort(result);
+            RCLCPP_ERROR(this->get_logger(),
+                "Motor %d: %s (state=%s)", node_id, result->message.c_str(),
+                result->final_state.c_str());
+            return;
+        }
+
+        // Transition 2: Switch On -> SWITCHED_ON
+        if (should_abort_action<EnableMotor>(goal_handle, start_time, timeout_duration,
+            "Enable motor")) {
+            return;
+        }
+
+        if (!execute_state_transition(node_id, motor, feedback, goal_handle,
+            "Switch On (transition to SWITCHED_ON)", 50.0,
+            [](auto fsm) {
+                return fsm->switch_on();
+            })) {
+            result->success = false;
+            result->message = "Failed at step: Switch On";
+            result->final_state = feedback->current_state;
+            result->final_statusword = feedback->statusword;
+            result->elapsed_time_sec = (this->now() - start_time).seconds();
+            goal_handle->abort(result);
+            RCLCPP_ERROR(this->get_logger(),
+                "Motor %d: %s (state=%s)", node_id, result->message.c_str(),
+                result->final_state.c_str());
+            return;
+        }
+
+        // Transition 3: Enable Operation -> OPERATION_ENABLED
+        if (should_abort_action<EnableMotor>(goal_handle, start_time, timeout_duration,
+            "Enable motor")) {
+            return;
+        }
+
+        if (!execute_state_transition(node_id, motor, feedback, goal_handle,
+            "Enable Operation (transition to OPERATION_ENABLED)", 80.0,
+            [](auto fsm) {
+                return fsm->enable_operation();
+            })) {
+            result->success = false;
+            result->message = "Failed at step: Enable Operation";
+            result->final_state = feedback->current_state;
+            result->final_statusword = feedback->statusword;
+            result->elapsed_time_sec = (this->now() - start_time).seconds();
+            goal_handle->abort(result);
+            RCLCPP_ERROR(this->get_logger(),
+                "Motor %d: %s (state=%s)", node_id, result->message.c_str(),
+                result->final_state.c_str());
+            return;
+        }
+
+        // Verify final state and complete
+        auto final_state = fsm->get_current_state(true);
+        result->final_state = canopen::cia402::get_state_description(final_state);
+        result->final_statusword = fsm->get_statusword();
+        result->elapsed_time_sec = (this->now() - start_time).seconds();
+
+        if (final_state == canopen::cia402::State::OPERATION_ENABLED) {
+            result->success = true;
+            result->message = "Motor enabled successfully";
+
+            feedback->current_state = result->final_state;
+            feedback->statusword = result->final_statusword;
+            feedback->progress_percent = 100.0;
+            feedback->transition_name = "Complete";
+            goal_handle->publish_feedback(feedback);
+
+            goal_handle->succeed(result);
+            RCLCPP_INFO(this->get_logger(),
+                "Motor %d enabled successfully in %.2fs (state=%s)",
+                node_id, result->elapsed_time_sec, result->final_state.c_str());
+        } else {
+            result->success = false;
+            result->message = "Unexpected final state: " + result->final_state +
+                " (expected OPERATION_ENABLED)";
+            goal_handle->abort(result);
+            RCLCPP_ERROR(this->get_logger(), "%s", result->message.c_str());
+        }
     }
 
 // =============================================================================
@@ -472,15 +609,148 @@ namespace ros2_waveshare {
     void MotorDriverNode::handle_reset_fault_accepted(
         uint8_t node_id,
         std::shared_ptr<ResetFaultGoalHandle> goal_handle) {
-        // TODO: Implement reset fault accepted handler
         RCLCPP_INFO(this->get_logger(),
-            "Reset fault accepted for node_id=%d - TODO", node_id);
+            "Reset fault accepted for node_id=%d, starting execution thread", node_id);
 
-        // For now, just succeed immediately
+        // Spawn execution thread (non-blocking)
+        std::thread{std::bind(&MotorDriverNode::execute_reset_fault, this, node_id,
+            goal_handle)}.detach();
+    }
+
+    void MotorDriverNode::execute_reset_fault(
+        uint8_t node_id,
+        std::shared_ptr<ResetFaultGoalHandle> goal_handle) {
+
+        const auto goal = goal_handle->get_goal();
         auto result = std::make_shared<ResetFault::Result>();
-        result->success = false;
-        result->message = "Reset fault not yet implemented";
-        goal_handle->succeed(result);
+        auto feedback = std::make_shared<ResetFault::Feedback>();
+
+        const auto start_time = this->now();
+        const auto timeout_duration = rclcpp::Duration::from_seconds(
+            goal->timeout_sec > 0 ? goal->timeout_sec : 5.0
+        );
+
+        RCLCPP_INFO(this->get_logger(),
+            "Executing reset fault for node_id=%d with timeout=%.1fs",
+            node_id, timeout_duration.seconds());
+
+        // Validate motor instance
+        auto motor = get_motor(node_id);
+        if (!motor) {
+            result->success = false;
+            result->message = "Invalid node_id: " + std::to_string(node_id);
+            result->final_state = "UNKNOWN";
+            result->elapsed_time_sec = (this->now() - start_time).seconds();
+            goal_handle->abort(result);
+            RCLCPP_ERROR(this->get_logger(), "%s", result->message.c_str());
+            return;
+        }
+
+        auto fsm = motor->get_fsm();
+        auto sdo_client = motor->get_sdo_client();
+        auto& dict = motor->get_dictionary();
+
+        // Read initial error register (object 0x1001)
+        try {
+            auto error_data = sdo_client->read_object("error_register");
+            result->error_register_before = dict.from_raw<uint8_t>(error_data);
+            feedback->error_register = result->error_register_before;
+            feedback->fault_cleared = false;
+
+            RCLCPP_INFO(this->get_logger(),
+                "Motor %d error register before reset: 0x%02X",
+                node_id, result->error_register_before);
+        } catch (const std::exception& e) {
+            RCLCPP_WARN(this->get_logger(),
+                "Motor %d: Could not read error register: %s", node_id, e.what());
+            result->error_register_before = 0xFF;  // Unknown
+        }
+
+        // Get initial state
+        update_fsm_feedback(motor, feedback, true);
+        goal_handle->publish_feedback(feedback);
+
+        RCLCPP_INFO(this->get_logger(),
+            "Motor %d initial state: %s (statusword=0x%04X)",
+            node_id, feedback->current_state.c_str(), feedback->statusword);
+
+        // Check if motor is actually in fault state
+        if (!fsm->has_fault()) {
+            result->success = true;
+            result->message = "Motor is not in fault state (no reset needed)";
+            result->error_register_after = result->error_register_before;
+            result->final_state = feedback->current_state;
+            result->elapsed_time_sec = (this->now() - start_time).seconds();
+
+            feedback->fault_cleared = true;
+            goal_handle->publish_feedback(feedback);
+            goal_handle->succeed(result);
+
+            RCLCPP_INFO(this->get_logger(), "%s", result->message.c_str());
+            return;
+        }
+
+        // Check for cancellation/timeout before executing reset
+        if (should_abort_action<ResetFault>(goal_handle, start_time, timeout_duration,
+            "Reset fault")) {
+            return;
+        }
+
+        // Execute fault reset
+        RCLCPP_INFO(this->get_logger(), "Motor %d: Executing fault reset...", node_id);
+        bool reset_success = fsm->reset_fault();
+
+        // Wait briefly for fault to clear
+        rclcpp::sleep_for(std::chrono::milliseconds(100));
+
+        // Verify fault cleared
+        auto final_state = fsm->get_current_state(true);
+        bool fault_cleared = !fsm->has_fault();
+
+        feedback->current_state = canopen::cia402::get_state_description(final_state);
+        feedback->statusword = fsm->get_statusword();
+        feedback->fault_cleared = fault_cleared;
+
+        // Read final error register
+        try {
+            auto error_data = sdo_client->read_object("error_register");
+            result->error_register_after = dict.from_raw<uint8_t>(error_data);
+            feedback->error_register = result->error_register_after;
+
+            RCLCPP_INFO(this->get_logger(),
+                "Motor %d error register after reset: 0x%02X",
+                node_id, result->error_register_after);
+        } catch (const std::exception& e) {
+            RCLCPP_WARN(this->get_logger(),
+                "Motor %d: Could not read error register after reset: %s", node_id, e.what());
+            result->error_register_after = 0xFF;  // Unknown
+        }
+
+        result->final_state = feedback->current_state;
+        result->elapsed_time_sec = (this->now() - start_time).seconds();
+
+        goal_handle->publish_feedback(feedback);
+
+        if (reset_success && fault_cleared) {
+            result->success = true;
+            result->message = "Fault reset successfully (state: " + result->final_state + ")";
+            goal_handle->succeed(result);
+
+            RCLCPP_INFO(this->get_logger(),
+                "Motor %d fault reset successful in %.2fs (error: 0x%02X → 0x%02X, state=%s)",
+                node_id, result->elapsed_time_sec,
+                result->error_register_before, result->error_register_after,
+                result->final_state.c_str());
+        } else {
+            result->success = false;
+            result->message = "Fault reset failed - fault bit still set (state: " +
+                result->final_state + ")";
+            goal_handle->abort(result);
+
+            RCLCPP_ERROR(this->get_logger(),
+                "Motor %d: %s (statusword=0x%04X)",
+                node_id, result->message.c_str(), feedback->statusword);
+        }
     }
 
 // =============================================================================
@@ -509,15 +779,233 @@ namespace ros2_waveshare {
     void MotorDriverNode::handle_move_accepted(
         uint8_t node_id,
         std::shared_ptr<MoveToPositionGoalHandle> goal_handle) {
-        // TODO: Implement move to position accepted handler
         RCLCPP_INFO(this->get_logger(),
-            "Move to position accepted for node_id=%d - TODO", node_id);
+            "Move to position accepted for node_id=%d, starting execution thread", node_id);
 
-        // For now, just succeed immediately
+        // Spawn execution thread (non-blocking)
+        std::thread{std::bind(&MotorDriverNode::execute_move, this, node_id, goal_handle)}.detach();
+    }
+
+    void MotorDriverNode::execute_move(
+        uint8_t node_id,
+        std::shared_ptr<MoveToPositionGoalHandle> goal_handle) {
+
+        const auto goal = goal_handle->get_goal();
         auto result = std::make_shared<MoveToPosition::Result>();
-        result->success = false;
-        result->message = "Move to position not yet implemented";
+        auto feedback = std::make_shared<MoveToPosition::Feedback>();
+
+        const auto start_time = this->now();
+        const auto timeout_duration = rclcpp::Duration::from_seconds(
+            goal->timeout_sec > 0 ? goal->timeout_sec : 30.0
+        );
+        const double position_tolerance = goal->position_tolerance_rad > 0 ?
+            goal->position_tolerance_rad : 0.01;  // Default 0.01 rad
+
+        RCLCPP_INFO(this->get_logger(),
+            "Executing move to position for node_id=%d: target=%.3f rad, tolerance=%.4f rad, timeout=%.1fs",
+            node_id, goal->target_position_rad, position_tolerance, timeout_duration.seconds());
+
+        // Get motor instance
+        auto motor = get_motor(node_id);
+        if (!motor) {
+            result->success = false;
+            result->message = "Invalid node_id: " + std::to_string(node_id);
+            result->elapsed_time_sec = (this->now() - start_time).seconds();
+            goal_handle->abort(result);
+            RCLCPP_ERROR(this->get_logger(), "%s", result->message.c_str());
+            return;
+        }
+
+        auto fsm = motor->get_fsm();
+        auto sdo_client = motor->get_sdo_client();
+        auto& dict = motor->get_dictionary();
+
+        // 1. Verify motor is enabled
+        auto current_state = fsm->get_current_state(true);
+        if (current_state != canopen::cia402::State::OPERATION_ENABLED) {
+            result->success = false;
+            result->message = "Motor not enabled. Current state: " +
+                std::string(canopen::cia402::get_state_description(current_state));
+            result->elapsed_time_sec = (this->now() - start_time).seconds();
+            goal_handle->abort(result);
+            RCLCPP_ERROR(this->get_logger(), "%s", result->message.c_str());
+            return;
+        }
+
+        // 2. Set operation mode to Profile Position (PP = 1)
+        RCLCPP_INFO(this->get_logger(), "Motor %d: Setting Profile Position mode...", node_id);
+        std::string mode_error_msg;
+        if (!set_operation_mode_verified(node_id, motor, 1, mode_error_msg)) {
+            result->success = false;
+            result->message = mode_error_msg;
+            result->elapsed_time_sec = (this->now() - start_time).seconds();
+            goal_handle->abort(result);
+            RCLCPP_ERROR(this->get_logger(), "%s", result->message.c_str());
+            return;
+        }
+
+        // 3. Set profile velocity and acceleration if provided
+        if (goal->max_velocity_rad_s > 0) {
+            try {
+                // Convert rad/s to encoder counts/s (using encoder resolution from params)
+                // For now, assuming direct value - should use conversion factor
+                uint32_t velocity_counts = static_cast<uint32_t>(goal->max_velocity_rad_s * 1000);  // Placeholder
+                auto vel_data = dict.to_raw(velocity_counts);
+                sdo_client->write_object("profile_velocity", vel_data);
+                RCLCPP_DEBUG(this->get_logger(), "Motor %d: Set profile velocity: %u", node_id,
+                    velocity_counts);
+            } catch (const std::exception& e) {
+                RCLCPP_WARN(this->get_logger(), "Motor %d: Could not set profile velocity: %s",
+                    node_id, e.what());
+            }
+        }
+
+        if (goal->max_acceleration_rad_s2 > 0) {
+            try {
+                uint32_t accel_counts = static_cast<uint32_t>(goal->max_acceleration_rad_s2 * 1000);  // Placeholder
+                auto accel_data = dict.to_raw(accel_counts);
+                sdo_client->write_object("profile_acceleration", accel_data);
+                RCLCPP_DEBUG(this->get_logger(), "Motor %d: Set profile acceleration: %u", node_id,
+                    accel_counts);
+            } catch (const std::exception& e) {
+                RCLCPP_WARN(this->get_logger(), "Motor %d: Could not set profile acceleration: %s",
+                    node_id, e.what());
+            }
+        }
+
+        // 4. Get initial position
+        double initial_position_rad = motor->get_position();  // From MotorInstance state
+        double total_distance = std::abs(goal->target_position_rad - initial_position_rad);
+
+        RCLCPP_INFO(this->get_logger(),
+            "Motor %d: Initial position=%.3f rad, target=%.3f rad, distance=%.3f rad",
+            node_id, initial_position_rad, goal->target_position_rad, total_distance);
+
+        // 5. Write target position
+        try {
+            // Convert radians to encoder counts (assuming encoder_resolution from params)
+            // For now using placeholder conversion - should use actual encoder resolution
+            int32_t target_counts = static_cast<int32_t>(goal->target_position_rad * 10000);  // Placeholder
+            auto target_data = dict.to_raw(target_counts);
+            sdo_client->write_object("target_position", target_data);
+
+            RCLCPP_INFO(this->get_logger(),
+                "Motor %d: Target position written: %d counts (%.3f rad)",
+                node_id, target_counts, goal->target_position_rad);
+        } catch (const std::exception& e) {
+            result->success = false;
+            result->message = "Failed to write target position: " + std::string(e.what());
+            result->elapsed_time_sec = (this->now() - start_time).seconds();
+            goal_handle->abort(result);
+            RCLCPP_ERROR(this->get_logger(), "%s", result->message.c_str());
+            return;
+        }
+
+        // 6. Start motion by setting bit 4 in controlword (new setpoint)
+        try {
+            uint16_t controlword = 0x001F;  // Enable operation + new setpoint
+            auto cw_data = dict.to_raw(controlword);
+            sdo_client->write_object("controlword", cw_data);
+            RCLCPP_INFO(this->get_logger(), "Motor %d: Motion started (controlword=0x%04X)",
+                node_id, controlword);
+        } catch (const std::exception& e) {
+            result->success = false;
+            result->message = "Failed to start motion: " + std::string(e.what());
+            result->elapsed_time_sec = (this->now() - start_time).seconds();
+            goal_handle->abort(result);
+            RCLCPP_ERROR(this->get_logger(), "%s", result->message.c_str());
+            return;
+        }
+
+        // 7. Monitor progress via PDO feedback
+        rclcpp::Rate feedback_rate(20);  // 20 Hz feedback updates
+        bool target_reached = false;
+
+        while (rclcpp::ok() && !target_reached) {
+            // Check for cancellation or timeout (with quick stop on abort)
+            if (goal_handle->is_canceling() || (this->now() - start_time) > timeout_duration) {
+                // Send quick stop
+                try {
+                    fsm->quick_stop();
+                } catch (...) {
+                }
+
+                result->final_position_rad = motor->get_position();
+                result->position_error_rad = goal->target_position_rad - result->final_position_rad;
+                result->target_reached = false;
+                result->elapsed_time_sec = (this->now() - start_time).seconds();
+
+                if (goal_handle->is_canceling()) {
+                    result->success = false;
+                    result->message = "Move to position cancelled by client";
+                    result->timed_out = false;
+                    goal_handle->canceled(result);
+                    RCLCPP_WARN(this->get_logger(), "%s", result->message.c_str());
+                } else {
+                    result->success = false;
+                    result->message = "Move to position timeout after " +
+                        std::to_string(result->elapsed_time_sec) + "s";
+                    result->timed_out = true;
+                    goal_handle->abort(result);
+                    RCLCPP_ERROR(this->get_logger(), "%s", result->message.c_str());
+                }
+                return;
+            }
+
+            // Get current state from MotorInstance (updated by PDO callbacks)
+            double current_position_rad = motor->get_position();
+            double current_velocity_rad_s = motor->get_velocity();
+            double distance_to_target = goal->target_position_rad - current_position_rad;
+            double distance_traveled = std::abs(current_position_rad - initial_position_rad);
+
+            // Calculate progress
+            double progress = (total_distance > 0) ?
+                (distance_traveled / total_distance) * 100.0 : 100.0;
+            progress = std::min(100.0, std::max(0.0, progress));
+
+            // Update feedback
+            feedback->current_position_rad = current_position_rad;
+            feedback->current_velocity_rad_s = current_velocity_rad_s;
+            feedback->distance_to_target_rad = distance_to_target;
+            feedback->progress_percent = static_cast<float>(progress);
+            feedback->elapsed_time_sec = (this->now() - start_time).seconds();
+
+            // Check if target reached
+            if (std::abs(distance_to_target) <= position_tolerance) {
+                feedback->target_reached = true;
+                target_reached = true;
+
+                RCLCPP_INFO(this->get_logger(),
+                    "Motor %d: Target reached! position=%.3f rad, error=%.4f rad",
+                    node_id, current_position_rad, distance_to_target);
+            } else {
+                feedback->target_reached = false;
+            }
+
+            goal_handle->publish_feedback(feedback);
+
+            RCLCPP_DEBUG(this->get_logger(),
+                "Motor %d progress: %.1f%%, position=%.3f rad, distance=%.3f rad",
+                node_id, progress, current_position_rad, distance_to_target);
+
+            feedback_rate.sleep();
+        }
+
+        // 8. Success
+        result->success = true;
+        result->message = "Target position reached successfully";
+        result->final_position_rad = motor->get_position();
+        result->position_error_rad = goal->target_position_rad - result->final_position_rad;
+        result->target_reached = true;
+        result->timed_out = false;
+        result->elapsed_time_sec = (this->now() - start_time).seconds();
+
         goal_handle->succeed(result);
+
+        RCLCPP_INFO(this->get_logger(),
+            "Motor %d move completed in %.2fs (final position=%.3f rad, error=%.4f rad)",
+            node_id, result->elapsed_time_sec, result->final_position_rad,
+            result->position_error_rad);
     }
 
 }  // namespace ros2_waveshare

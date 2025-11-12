@@ -1,0 +1,78 @@
+---
+title: Single Motor Test System Architecture
+config:
+    theme: forest
+---
+graph TB
+    subgraph "User Interface Layer"
+        TELEOP[Teleop Node<br/>teleop_velocity_node]
+        TELEOP_IN[/Keyboard Input<br/>↑ ↓ 0 ESC/]
+    end
+
+    subgraph "Control Layer"
+        VC[Velocity Converter Node<br/>velocity_converter_node]
+        PLUGIN[Dynamic Model Plugin<br/>Pluginlib Interface]
+        
+        subgraph "Plugin Implementations"
+            SINGLE[SingleMotorModel<br/>Simple PID Control]
+            DIFF[DifferentialDriveModel<br/>Future]
+            ACKER[AckermannModel<br/>Future]
+        end
+    end
+
+    subgraph "ROS2 Middleware Layer"
+        MD[Motor Driver Node<br/>motor_driver_node]
+        ODO[Odometry Publisher<br/>odometry_publisher_node]
+    end
+
+    subgraph "CANopen Communication Layer"
+        BRIDGE[SocketCAN Bridge<br/>canopen_lifecycle_node]
+    end
+
+    subgraph "Hardware Layer"
+        CAN[(CAN Bus<br/>vcan0)]
+        MOTOR1[Motor Driver 1<br/>Node ID: 2<br/>MICROPHASE TRAC_PWR]
+    end
+
+    %% User Input Flow
+    TELEOP_IN -.->|User Input| TELEOP
+    TELEOP -->|/cmd_vel<br/>Twist| VC
+
+    %% Plugin Architecture
+    VC -->|Load Plugin| PLUGIN
+    PLUGIN -.->|Uses| SINGLE
+    PLUGIN -.->|Future| DIFF
+    PLUGIN -.->|Future| ACKER
+
+    %% Control Loop
+    VC -->|/motors/motor_1/command<br/>MotorCommand| MD
+    MD -->|/motors/motor_1/feedback<br/>MotorFeedback| VC
+    MD -->|/motors/motor_1/feedback<br/>MotorFeedback| ODO
+
+    %% CANopen Communication
+    MD -->|PDO/SDO| BRIDGE
+    BRIDGE <-->|CAN Frames| CAN
+    CAN <-->|CANopen Protocol| MOTOR1
+
+    %% Odometry Publishing
+    ODO -->|/odom<br/>Odometry| TELEOP
+    ODO -->|/tf<br/>odom→base_link| TELEOP
+
+    %% Feedback Paths
+    MOTOR1 -.->|Encoder Position<br/>Encoder Velocity| MD
+    MD -.->|Feedback| VC
+
+    %% Styling
+    classDef userLayer fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef controlLayer fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef middlewareLayer fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef commsLayer fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef hardwareLayer fill:#ffebee,stroke:#b71c1c,stroke-width:2px
+    classDef pluginLayer fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+
+    class TELEOP,TELEOP_IN userLayer
+    class VC controlLayer
+    class PLUGIN,SINGLE,DIFF,ACKER pluginLayer
+    class MD,ODO middlewareLayer
+    class BRIDGE commsLayer
+    class CAN,MOTOR1 hardwareLayer

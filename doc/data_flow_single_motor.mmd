@@ -1,0 +1,114 @@
+---
+title: Data Flow Diagram
+config:
+    theme: forest
+---
+graph TD
+    subgraph "Input"
+        USER[User Keyboard]
+    end
+
+    subgraph "Teleop Node"
+        KEY[Key Handler]
+        VEL_GEN[Velocity Generator]
+        RAMP[Velocity Ramping]
+    end
+
+    subgraph "Velocity Converter Node"
+        SUB_VEL["/cmd_vel Subscriber"]
+        SUB_FB["/feedback Subscriber"]
+        PLUGIN_MGR[Plugin Manager]
+        PUB_CMD["/command Publisher"]
+
+        subgraph "Plugin: Single Motor Model"
+            FB_STATE[Feedback State]
+            ERROR_CALC[Error Calculator]
+            PID[PID Controller]
+            LIMITER["Velocity/Accel Limiter"]
+            CMD_GEN[Command Generator]
+        end
+    end
+
+    subgraph "Motor Driver Node"
+        SUB_CMD["/command Subscriber"]
+        FSM[CIA402 FSM]
+        SDO[SDO Client]
+        PDO_TX[PDO Transmitter]
+        PDO_RX[PDO Receiver]
+        PUB_FB["/feedback Publisher"]
+    end
+
+    subgraph "CANopen Layer"
+        CAN_TX[CAN TX Queue]
+        CAN_RX[CAN RX Queue]
+    end
+
+    subgraph "Odometry Publisher"
+        SUB_FB2["/feedback Subscriber"]
+        INTEGRATOR[Encoder Integrator]
+        POSE_CALC[Pose Calculator]
+        PUB_ODOM["/odom Publisher"]
+        PUB_TF["/tf Broadcaster"]
+    end
+
+    subgraph "Motor Hardware"
+        MOTOR[Physical Motor<br/>Encoder + Driver]
+    end
+
+    %% User Input Flow
+    USER -->|Key Press| KEY
+    KEY -->|↑↓0 ESC| VEL_GEN
+    VEL_GEN -->|Target Velocity| RAMP
+    RAMP -->|Smoothed Twist| SUB_VEL
+
+    %% Velocity Converter Flow
+    SUB_VEL -->|cmd_vel| PLUGIN_MGR
+    SUB_FB -->|motor_feedback| FB_STATE
+    
+    PLUGIN_MGR -->|Activate Plugin| ERROR_CALC
+    FB_STATE -->|Current State| ERROR_CALC
+    ERROR_CALC -->|Error Signal| PID
+    PID -->|Control Output| LIMITER
+    LIMITER -->|Limited Command| CMD_GEN
+    CMD_GEN -->|MotorCommand| PUB_CMD
+
+    %% Motor Driver Flow
+    PUB_CMD -->|motor_command| SUB_CMD
+    SUB_CMD -->|Parse Command| FSM
+    FSM -->|Check State| PDO_TX
+    PDO_TX -->|RPDO1: target_velocity| CAN_TX
+    
+    CAN_RX -->|TPDO1: position, statusword| PDO_RX
+    CAN_RX -->|TPDO2: velocity, current| PDO_RX
+    PDO_RX -->|Parse PDOs| PUB_FB
+
+    %% CAN Communication
+    CAN_TX <-->|CAN Frames| MOTOR
+    MOTOR <-->|CAN Frames| CAN_RX
+
+    %% Feedback Loops
+    PUB_FB -->|feedback| SUB_FB
+    PUB_FB -->|feedback| SUB_FB2
+
+    %% Odometry Flow
+    SUB_FB2 -->|Encoder Data| INTEGRATOR
+    INTEGRATOR -->|Integrated Position| POSE_CALC
+    POSE_CALC -->|Odometry Msg| PUB_ODOM
+    POSE_CALC -->|TF Transform| PUB_TF
+
+    %% Styling
+    classDef inputStyle fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef teleStyle fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef converterStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef pluginStyle fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    classDef driverStyle fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+    classDef canStyle fill:#ffebee,stroke:#b71c1c,stroke-width:2px
+    classDef odoStyle fill:#e0f2f1,stroke:#004d40,stroke-width:2px
+
+    class USER inputStyle
+    class KEY,VEL_GEN,RAMP teleStyle
+    class SUB_VEL,SUB_FB,PLUGIN_MGR,PUB_CMD converterStyle
+    class FB_STATE,ERROR_CALC,PID,LIMITER,CMD_GEN pluginStyle
+    class SUB_CMD,FSM,SDO,PDO_TX,PDO_RX,PUB_FB driverStyle
+    class CAN_TX,CAN_RX,MOTOR canStyle
+    class SUB_FB2,INTEGRATOR,POSE_CALC,PUB_ODOM,PUB_TF odoStyle

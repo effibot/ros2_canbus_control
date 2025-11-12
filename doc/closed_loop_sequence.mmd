@@ -1,0 +1,69 @@
+---
+title: Closed-Loop Control Sequence
+config:
+    theme: forest
+---
+sequenceDiagram
+    participant User
+    participant Teleop as Teleop Node
+    participant Converter as Velocity Converter
+    participant Plugin as Dynamic Model Plugin
+    participant Driver as Motor Driver Node
+    participant Motor as Physical Motor
+    participant Odom as Odometry Publisher
+
+    Note over User,Odom: Initialization Phase
+    Converter->>Plugin: load_plugin("single_motor_model")
+    Plugin->>Plugin: initialize(params)
+    Driver->>Motor: Enable Motor (CIA402 FSM)
+    Motor-->>Driver: State: OPERATION_ENABLED
+
+    Note over User,Odom: Runtime Control Loop (10-100 Hz)
+    User->>Teleop: Press ↑ (increase speed)
+    Teleop->>Converter: /cmd_vel (linear.x = 0.5 m/s)
+    
+    Note over Converter,Plugin: Closed-Loop Computation
+    Converter->>Driver: Request current feedback
+    Driver-->>Converter: MotorFeedback (position, velocity, current)
+    
+    Converter->>Plugin: update(cmd_vel, feedback)
+    Plugin->>Plugin: Compute error = target - actual
+    Plugin->>Plugin: PID control calculation
+    Plugin->>Plugin: Apply velocity/acceleration limits
+    Plugin-->>Converter: MotorCommand (target_velocity_rad_s)
+    
+    Converter->>Driver: /motors/motor_1/command
+    Driver->>Motor: Write RPDO1 (target_velocity)
+    
+    Note over Motor: Motor executes velocity profile
+    Motor-->>Driver: TPDO1 (statusword, position)
+    Motor-->>Driver: TPDO2 (velocity, current)
+    
+    Driver->>Converter: /motors/motor_1/feedback
+    Driver->>Odom: /motors/motor_1/feedback
+    
+    Odom->>Odom: Integrate encoder velocity
+    Odom->>Odom: Calculate pose (x, y, theta)
+    Odom->>Teleop: /odom (nav_msgs/Odometry)
+    Odom->>Teleop: /tf (odom → base_link)
+
+    Note over User,Odom: User Stops Motion
+    User->>Teleop: Press '0' (stop)
+    Teleop->>Converter: /cmd_vel (linear.x = 0)
+    Converter->>Plugin: update(zero_velocity, feedback)
+    Plugin->>Plugin: Ramp down to zero
+    Plugin-->>Converter: MotorCommand (0 rad/s)
+    Converter->>Driver: /motors/motor_1/command
+    Driver->>Motor: Write RPDO1 (velocity = 0)
+    Motor-->>Driver: Motor decelerates to stop
+
+    Note over User,Odom: Shutdown Sequence
+    User->>Teleop: Press ESC (exit)
+    Teleop->>Converter: Shutdown signal
+    Converter->>Plugin: shutdown()
+    Plugin-->>Converter: Safe stop command
+    Converter->>Driver: Stop command (velocity = 0)
+    Converter->>Driver: Service: reset_fault (if needed)
+    Driver->>Motor: Disable Operation (CIA402 FSM)
+    Motor-->>Driver: State: SWITCH_ON_DISABLED
+    Teleop->>Teleop: Exit gracefully

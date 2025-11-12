@@ -2,202 +2,321 @@
 
 ## Project Overview
 
-ROS2 middleware for industrial motor control using Waveshare USB-CAN-A adapters. The system bridges USB-CAN hardware (`/dev/ttyUSB*`) to Linux SocketCAN, integrating with CANOpen for MICROPHASE TRAC_PWR servo drives (DS-402 profile).
+ROS2 middleware for industrial motor control using Waveshare USB-CAN-A adapters. Implements complete CANopen stack with CIA402 motor control for MICROPHASE TRAC_PWR servo drives.
 
-**Status**: Waveshare C++ library complete (132 tests, 100%), SocketCAN bridge operational, CANOpen lifecycle nodes active, targeting 4-motor traction control with PDO/SDO.
+**Status**: ✅ CANopen layer complete, ✅ Motor driver node implemented with PDO/SDO, 🚧 Action handlers in progress (enable motor, fault reset, position moves).
 
-**Critical Architecture**: `USB Hardware → Serial Protocol → SocketCAN Bridge → CANOpen Stack → ROS2 Control`
+**Critical Architecture**: `USB Hardware → Serial Protocol → SocketCAN Bridge → CANopen Stack → ROS2 Motor Driver Node`
 
 ## Core Components
 
-1. **Waveshare C++ Library** (`src/ros2_waveshare/lib/waveshare_cpp/`) - Git submodule
-   - State-First Architecture with CRTP patterns
-   - Serial I/O via POSIX termios2 (up to 2Mbps)
-   - Thread-safe: 3-mutex pattern (state/write/read)
-   - Frame types: FixedFrame (20B), VariableFrame (5-15B), ConfigFrame (20B)
-   
-2. **ROS2 Lifecycle Bridge** (`src/ros2_waveshare/`) - Package: `ros2_waveshare`
-   - `CanopenLifeCycleNode`: Manages SocketCAN bridge lifecycle
-   - Wraps `SocketCANBridge` from waveshare_cpp library
-   - Launch: `bridge_bringup.launch.py` with `bridge_params.yaml`
-   
-3. **CANOpen Configuration** (`src/microphase_can_config/`) - Package: `microphase_can_config`
-   - Bus config: `bus.yml` defines 4 nodes (IDs 2-5) + master (ID 1)
-   - EDS file: `config/can_config/eds/TRACTION_PWR.eds` (DS-402 compliant)
-   - Unified launch: `microphase_can_config.launch.py` starts bridge + CANOpen stack
-   
-4. **Speed Control** (`src/speed_control/`) - Package: `speed_control`
-   - High-level motor control with custom message types
-   - Legacy implementation - PDO/SDO handling being migrated to CANOpen stack
+### 1. Waveshare C++ Library (`src/ros2_waveshare/lib/waveshare_cpp/`) - Git Submodule
+- **State-First Architecture** with CRTP patterns (see library's own `.github/copilot-instructions.md`)
+- Serial I/O via POSIX termios2 (up to 2Mbps)
+- Thread-safe: 3-mutex pattern in USBAdapter, lock-free atomics in SocketCANBridge/PDOManager
+- **CANopen complete**: SDOClient, PDOManager, CIA402FSM, ObjectDictionary (enum-first design, NO magic numbers)
+
+### 2. ROS2 Lifecycle Bridge (`src/ros2_waveshare/canopen_lifecycle*`) - Package: `ros2_waveshare`
+- `CanopenLifeCycleNode`: Manages SocketCAN bridge lifecycle  
+- Wraps `SocketCANBridge` from waveshare_cpp library
+- Launch: `bridge_bringup.launch.py` with `bridge_params.yaml`
+
+### 3. Motor Driver Node (`src/ros2_waveshare/motor_driver_*`) - Package: `ros2_waveshare`
+- **Architecture**: Single node manages multiple motors (1-4) on shared CAN bus
+- **File Structure** (modular design):
+  - `motor_driver_node.cpp` - Initialization (CAN, motors, PDO, publishers, timers)
+  - `motor_driver_handlers.cpp` - ROS2 service callbacks (SDO read/write, mode setting, motor info)
+  - `motor_driver_callbacks.cpp` - PDO callbacks, timer callbacks, message builders
+  - `motor_instance.{cpp,hpp}` - Per-motor state container with thread-safe accessors
+- **ROS2 Interfaces** (per motor):
+  - Services: `/motors/motor_N/{sdo/read, sdo/write, set_operation_mode, get_motor_info}`
+  - Actions: `/motors/motor_N/{enable, reset_fault, move_to_position}`
+  - Publishers: `/motors/motor_N/{feedback, status}`, `/joint_states`, `/diagnostics`
+  - Subscribers: `/motors/motor_N/command`
+
+### 4. CANopen Configuration (`src/microphase_can_config/`) - Package: `microphase_can_config`
+- Bus config: `bus.yml` defines 4 nodes (IDs 2-5) + master (ID 1)
+- EDS file: `config/can_config/eds/TRACTION_PWR.eds` (CIA402 compliant)
+- Unified launch: `microphase_can_config.launch.py` starts bridge + CANopen stack
 
 ## Critical Development Patterns
 
-### State-First Architecture (Waveshare Library)
+### Library Helper Usage (MANDATORY Pattern)
 
-**Core Principle**: Frames hold state, buffers generated on-demand
+**Core Principle**: NEVER manually manipulate bytes for CANopen data. Always use library helpers.
+
 ```cpp
-// CORRECT: State-first pattern
-FixedFrame frame;
-frame.set_id(0x123);              // Modifies data_state_.can_id
-frame.set_data({0x11, 0x22});     // Modifies data_state_.data
-auto buffer = frame.serialize();   // Generates 20-byte protocol buffer NOW
+// ✅ CORRECT: Type-safe byte conversion
+auto& dict = motor->get_dictionary();
 
-// WRONG: Don't manipulate buffers directly
-// Frame does NOT expose internal buffers for modification
+// Writing SDO
+uint16_t controlword = 0x000F;
+std::vector<uint8_t> data = dict.to_raw(controlword);  // Handles endianness
+sdo_client->write_object("controlword", data);
+
+// Reading SDO
+auto data = sdo_client->read_object("statusword");
+uint16_t statusword = dict.from_raw<uint16_t>(data);  // Type-safe parsing
+
+// ❌ WRONG: Manual byte manipulation
+data.push_back(controlword & 0xFF);        // DON'T DO THIS
+data.push_back((controlword >> 8) & 0xFF); // Library handles it!
 ```
 
-**CRTP Hierarchy**: `CoreInterface<T>` → `DataInterface<T>` → `FixedFrame/VariableFrame`
-- Interfaces use `derived()` to call `impl_serialize()`, `impl_deserialize()` in concrete frames
-- See `src/ros2_waveshare/lib/waveshare_cpp/.github/copilot-instructions.md` for full details
+**CIA402 State Helpers** (always use for user-facing messages):
+```cpp
+// Decode statusword to enum
+auto state = canopen::cia402::decode_statusword(statusword);
+
+// Get human-readable strings
+const char* state_name = canopen::cia402::get_state_description(state);
+// Returns: "Operation Enabled", "Fault", "Switch On Disabled", etc.
+
+const char* mode_desc = canopen::cia402::get_mode_description(mode_value);
+// Returns: "Profile Position (PP)", "Cyclic Sync Velocity (CSV)", etc.
+
+// ✅ Enhanced error messages
+RCLCPP_ERROR(logger, "Mode verification failed: requested %d (%s) but got %d (%s)",
+    requested, canopen::cia402::get_mode_description(requested),
+    actual, canopen::cia402::get_mode_description(actual));
+```
+
+**Supported Types**: `uint8_t`, `int8_t`, `uint16_t`, `int16_t`, `uint32_t`, `int32_t`  
+**Template Instantiations**: Explicitly defined in `object_dictionary.cpp` - compiler will error if you try unsupported types.
+
+### Motor Driver Node Architecture
+
+**Initialization Sequence** (constructor):
+1. `load_parameters()` - Read ROS2 params (CAN interface, rates, limits, etc.)
+2. `initialize_can_socket()` - Open shared `RealCANSocket` for all motors
+3. `initialize_motors()` - For each motor:
+   - Load object dictionary from JSON config
+   - Create `SDOClient`, `CIA402FSM` instances
+   - Setup per-motor ROS2 interfaces (publishers, subscribers, services, actions)
+4. `initialize_pdo_manager()` - Single `PDOManager` for all motors
+   - Register TPDO1/TPDO2 callbacks per motor
+   - Start receive thread
+5. `setup_publishers()` - Combined publishers (`/joint_states`, `/diagnostics`, `/pdo_statistics`)
+6. `setup_timers()` - SYNC (100Hz), JointState (100Hz), Diagnostics (1Hz)
+
+**PDO Callback Pattern** (real-time feedback processing):
+```cpp
+void MotorDriverNode::on_tpdo1_received(uint8_t node_id, const can_frame& frame) {
+    auto motor = get_motor(node_id);
+    auto& dict = motor->get_dictionary();
+    
+    // Parse TPDO1: Statusword (bytes 0-1) + Position (bytes 2-5)
+    std::vector<uint8_t> statusword_data(frame.data, frame.data + 2);
+    uint16_t statusword = dict.from_raw<uint16_t>(statusword_data);
+    
+    std::vector<uint8_t> position_data(frame.data + 2, frame.data + 6);
+    int32_t position_counts = dict.from_raw<int32_t>(position_data);
+    
+    // Update motor state (thread-safe)
+    motor->update_statusword(statusword);
+    motor->update_position(position_counts);
+    motor->update_last_tpdo1_time(this->now());
+    
+    // Publish individual motor feedback
+    auto msg = build_motor_feedback(node_id);
+    motor->get_feedback_publisher()->publish(msg);
+}
+```
+
+**Service Handler Pattern** (synchronous SDO operations):
+```cpp
+void MotorDriverNode::handle_sdo_write(...) {
+    auto motor = get_motor(node_id);
+    auto& dict = motor->get_dictionary();
+    
+    // Convert request value to bytes using library helper
+    std::vector<uint8_t> data;
+    switch (request->value_type) {
+        case "uint16": data = dict.to_raw(request->value_u16); break;
+        case "int32":  data = dict.to_raw(request->value_i32); break;
+        // ... etc
+    }
+    
+    // SDO write (blocks until complete or timeout)
+    motor->get_sdo_client()->write_object(request->object_name, data);
+    
+    response->success = true;
+}
+```
 
 ### ROS2 Workspace Management
 
-**Build Commands** (always from workspace root):
+**Build Commands** (always from workspace root `/home/ros/ws`):
 ```bash
-# Full build with dependency install
-rosdep install --from-paths src --ignore-src -r -y
-colcon build --symlink-install
+# Custom alias (defined in shell)
+ros_build_pkg ros2_waveshare              # Incremental build, single package
+ros_build_pkg ros2_waveshare microphase_can_config  # Multiple packages
 
-# Incremental build for specific packages
-colcon build --symlink-install --packages-select ros2_waveshare microphase_can_config
+# Standard colcon (if alias unavailable)
+colcon build --packages-select ros2_waveshare --symlink-install --merge-install
+
+# Clean rebuild
+rm -rf build/ros2_waveshare install/ros2_waveshare
+colcon build --packages-select ros2_waveshare --symlink-install --merge-install
 
 # Source after every build
 source install/setup.bash
 ```
 
-**Environment Setup**: 
-- Development currently in WSL (will move to Docker container)
-- Use `scripts/build_ws.sh` for automated builds (expects `WORKSPACE` env variable)
-- Workspace root varies by environment - use `$(pwd)` for relative paths in scripts
+**File Organization**:
+```
+src/ros2_waveshare/
+├── src/
+│   ├── canopen_lifecycle.cpp        # Lifecycle bridge node
+│   ├── motor_driver_node.cpp        # Motor driver initialization
+│   ├── motor_driver_handlers.cpp    # Service callbacks (SDO, mode, info)
+│   ├── motor_driver_callbacks.cpp   # PDO callbacks, timers, message builders
+│   └── motor_instance.cpp            # Per-motor state container
+├── include/ros2_waveshare/
+│   ├── canopen_lifecycle.hpp
+│   ├── motor_driver_node.hpp         # Main node header (400+ lines)
+│   └── motor_instance.hpp            # Motor state + ROS2 interface holders
+├── lib/waveshare_cpp/                # Git submodule (see its own copilot-instructions.md)
+└── CMakeLists.txt                    # Auto-collects src/motor_*.cpp
+```
+
+**CMake Pattern**: Uses `file(GLOB_RECURSE MOTOR_DRIVER_SOURCES "src/motor_*.cpp")` - automatically picks up new `motor_*.cpp` files. No manual CMake edits needed for new motor driver source files.
 
 ### SocketCAN Bridge Setup
 
 **Required One-Time Setup**:
 ```bash
-# 1. Load kernel modules immediately
+# 1. Load kernel modules
 sudo modprobe can can-raw can-bcm vcan
 
-# Persist modules at boot (create /etc/modules-load.d/vcan.conf)
-echo "can" | sudo tee /etc/modules-load.d/can.conf
-echo "can-raw" | sudo tee -a /etc/modules-load.d/can.conf
-echo "can-bcm" | sudo tee -a /etc/modules-load.d/can.conf
-echo "vcan" | sudo tee /etc/modules-load.d/vcan.conf
+# 2. Persist at boot
+echo "can\ncan-raw\ncan-bcm\nvcan" | sudo tee /etc/modules-load.d/can.conf
 
-# 2. Create virtual CAN interface (for testing without hardware)
+# 3. Create virtual CAN (testing without hardware)
 sudo ip link add dev vcan0 type vcan
 sudo ip link set up vcan0
 
-# 3. USB device permissions (persist via udev rule)
-# Create /etc/udev/rules.d/50-myusb.rules:
-KERNEL=="ttyUSB[0-9]*",MODE="0666"
-KERNEL=="ttyACM[0-9]*",MODE="0666"
-# Then: sudo udevadm control --reload-rules && sudo udevadm trigger
+# 4. USB permissions
+echo 'KERNEL=="ttyUSB[0-9]*",MODE="0666"' | sudo tee /etc/udev/rules.d/50-myusb.rules
+sudo udevadm control --reload-rules && sudo udevadm trigger
 ```
 
 **Bridge Operation**: Node creates `/dev/ttyUSB0` ↔ `vcan0` bidirectional forwarding
-- Configure: Reads YAML params, validates USB device
-- Activate: Opens serial port, creates SocketCAN socket, starts forwarding threads
-- Deactivate: Stops threads, closes connections
+- **Configure**: Validates USB device, reads YAML params
+- **Activate**: Opens serial + SocketCAN, starts forwarding threads
+- **Deactivate**: Stops threads, closes connections
 
-### CANOpen Device Integration
+### Lifecycle Node Launch Pattern
 
-**DS-402 Object Dictionary** (from `TRACTION_PWR.eds`):
+**Auto-Activation in Launch Files**:
+```python
+# bridge_bringup.launch.py snippet
+lifecycle_node = LifecycleNode(
+    package='ros2_waveshare',
+    executable='canopen_lifecycle_node',
+    name='waveshare_bridge',
+    parameters=[bridge_params],
+    output='screen',
+)
+
+# Automatic transition to active state
+configure_event = EmitEvent(event=ChangeState(
+    lifecycle_node_matcher=matches_action(lifecycle_node),
+    transition_id=lifecycle_msgs.msg.Transition.TRANSITION_CONFIGURE,
+))
+
+activate_event = RegisterEventHandler(
+    OnStateTransition(
+        target_lifecycle_node=lifecycle_node,
+        goal_state='inactive',
+        entities=[EmitEvent(event=ChangeState(
+            lifecycle_node_matcher=matches_action(lifecycle_node),
+            transition_id=lifecycle_msgs.msg.Transition.TRANSITION_ACTIVATE,
+        ))],
+    )
+)
 ```
-0x6040 - Control Word (16-bit, RW, PDO)    # State machine control
-0x6041 - Status Word (16-bit, RO, PDO)     # Drive state feedback
-0x6060 - Mode of Operation (8-bit, RW)     # 1=PP, 3=PV, 4=TQ, etc.
-0x607A - Target Position (32-bit, RW, PDO)
-0x60FF - Target Velocity (32-bit, RW, PDO)
-0x606C - Velocity Actual (32-bit, RO, PDO)
-0x6064 - Position Actual (32-bit, RO, PDO)
-```
 
-**Launch System**:
-```bash
-# Full system: Bridge + CANOpen stack
-ros2 launch microphase_can_config microphase_can_config.launch.py
-
-# Verify lifecycle state
-ros2 lifecycle get /waveshare_bridge  # Should be: active
-
-# Monitor diagnostics
-ros2 topic echo /diagnostics
-
-# List CANOpen topics (once stack starts)
-ros2 topic list | grep -E 'rpdo|tpdo|sdo'
-```
-
-### Lifecycle Node Transitions
-
-**State Machine**: `unconfigured` → `inactive` → `active` → `inactive` → `cleanup` → `shutdown`
-
-**Transitions in `CanopenLifeCycleNode`**:
-- `on_configure`: Load YAML params, create `BridgeConfig`, validate USB device exists
-- `on_activate`: Instantiate `SocketCANBridge`, open serial + socket, start forwarding
-- `on_deactivate`: Stop bridge threads, close connections (USB still accessible)
-- `on_cleanup`: Destroy bridge object, reset params
-- `on_shutdown`: Final cleanup from any state
-
-**Launch File Automation**: `bridge_bringup.launch.py` uses `auto_configure` and `auto_activate` args to trigger transitions automatically.
+**Critical**: Always use `matches_action(node_instance)` instead of `matches_node_name()` to avoid duplicate node detection issues in multi-launch environments.
 
 ## Debugging Workflows
 
-**Testing Strategy**: Manual execution and debugging only - no automated integration tests currently implemented.
-
 ### Hardware-Independent Testing
 ```bash
-# Waveshare library unit tests (132 tests, no hardware needed)
+# Waveshare library tests (132 tests, no hardware)
 cd src/ros2_waveshare/lib/waveshare_cpp
 cmake -B build && cmake --build build
 ctest --test-dir build --output-on-failure
 
-# SocketCAN simulation (without USB adapter)
-# Terminal 1: Monitor vcan0
-candump vcan0
-
-# Terminal 2: Send test frames
-cansend vcan0 "123#DEADBEEF"
-
-# Terminal 3: Bridge with mock USB (if adapted for testing)
-./build/scripts/wave_reader /dev/ttyUSB0  # Will timeout if no device
+# SocketCAN simulation (vcan0)
+candump vcan0                    # Terminal 1: Monitor
+cansend vcan0 "123#DEADBEEF"     # Terminal 2: Send test frames
 ```
 
-### Hardware Debugging
+### Motor Driver Node Testing
 ```bash
-# 1. Verify USB device presence
-ls -l /dev/ttyUSB*  # Should show ttyUSB0 (or similar)
+# Launch full system
+ros2 launch microphase_can_config microphase_can_config.launch.py
 
-# 2. Check permissions
-sudo chmod 666 /dev/ttyUSB0  # Temporary fix
+# Verify nodes active
+ros2 lifecycle get /waveshare_bridge  # Should be: active
+ros2 node list | grep motor_driver    # Should show motor_driver node
 
-# 3. Test direct USB communication (wave_reader from waveshare_cpp)
-cd src/ros2_waveshare/lib/waveshare_cpp/build
-./scripts/wave_reader /dev/ttyUSB0
+# Test SDO services (works without motors in simulation)
+ros2 service call /motors/motor_1/sdo/write ros2_waveshare_msgs/srv/SDOWrite \
+  "{object_name: 'controlword', value_u16: 6, value_type: 'uint16'}"
 
-# 4. Run bridge standalone (non-ROS)
-./scripts/wave_bridge -d /dev/ttyUSB0 -i vcan0 -b 2000000 -c 1000000
+ros2 service call /motors/motor_1/sdo/read ros2_waveshare_msgs/srv/SDORead \
+  "{object_name: 'statusword'}"
 
-# 5. Monitor bridge in ROS2
-ros2 topic echo /diagnostics  # Shows TX/RX counts, errors
-ros2 lifecycle get /waveshare_bridge
+# Monitor feedback (100Hz when motors connected)
+ros2 topic echo /motors/motor_1/feedback --no-arr
+ros2 topic echo /joint_states
+
+# Check PDO statistics
+ros2 topic echo /motors/pdo_statistics
 ```
 
-**Serial Port Exclusivity**: Only one process can open `/dev/ttyUSB0`. If bridge is running, `wave_writer` auto-detects and falls back to SocketCAN mode.
+### Common Error Patterns
 
-### CANOpen Stack Debugging
-```bash
-# Check node discovery
-ros2 topic echo /device_manager_node/heartbeat  # CANOpen heartbeat messages
+**Linker Errors** (`undefined reference to ...`):
+- **Cause**: New source file not compiled (CMake caching issue)
+- **Fix**: `rm -rf build/ros2_waveshare && colcon build --packages-select ros2_waveshare`
 
-# SDO read example (once integrated)
-ros2 service call /sdo_read canopen_interfaces/srv/CORead "{node_id: 2, index: 0x6041, subindex: 0}"
+**Message Field Name Mismatches**:
+- **Symptom**: `error: 'struct MotorFeedback' has no member named 'position'`
+- **Fix**: Check actual message definition in `src/ros2_waveshare_msgs/msg/*.msg`
+- **Pattern**: Message uses `position_rad` not `position`, `target_velocity_rad_s` not `target_velocity`
 
-# PDO monitoring
-ros2 topic echo /tpdo1  # Check for position/velocity feedback
-```
+**PDO Callback Not Firing**:
+- **Check**: `pdo_manager_->is_running()` returns true
+- **Check**: TPDO callbacks registered for correct node_id
+- **Debug**: Add `RCLCPP_INFO` at start of `on_tpdo1_received()` to verify it's called
 
-## File Organization
+## Message Type Conventions
 
+**MotorCommand** (subscriber input):
+- `target_position_rad` (NOT `target_position`)
+- `target_velocity_rad_s` (NOT `target_velocity`)
+- `target_torque_nm`
+
+**MotorFeedback** (publisher output):
+- `position_rad`, `velocity_rad_s`, `torque_nm` (SI units)
+- `encoder_counts`, `velocity_counts_per_sec`, `current_ma` (raw values)
+- `statusword`, `operation_mode_display`, `state` (CIA402)
+
+**PDOStatistics** (aggregated across motors):
+- Single scalar values: `tpdo1_received`, `tpdo2_received`, `rpdo1_sent`, etc.
+- NOT arrays - aggregate totals from all motors
+
+## Future Work
+
+**Next Implementation Tasks** (in order):
+1. **Enable Motor Action** - CIA402 state machine transitions (Shutdown → Switch On → Enable Operation)
+2. **Reset Fault Action** - Clear fault state, verify with `decode_statusword()`
+3. **Move to Position Action** - Profile Position mode with progress monitoring via PDO feedback
+
+**Reference**: See waveshare_cpp library's `include/canopen/cia402_fsm.hpp` for state machine implementation.
 **Configuration**: All YAML/launch files in `*/config/` and `*/launch/` subdirectories
 - `bridge_params.yaml`: Serial baud (2Mbps), CAN baud (500k/1Mbps), interface names
 - `bus.yml`: CANOpen node IDs, EDS paths, driver types

@@ -1,0 +1,69 @@
+---
+title: Teleop State Machine
+config:
+    theme: forest
+---
+stateDiagram-v2
+    [*] --> Initializing: Launch Teleop Node
+    
+    Initializing --> Idle: Publishers/Subscribers Ready
+    
+    Idle --> Accelerating: Press ↑
+    Idle --> Decelerating: Press ↓
+    Idle --> Stopping: Press 0
+    Idle --> Shutdown: Press ESC
+    
+    Accelerating --> CruisingForward: Velocity >= 1.0 m/s
+    Accelerating --> Idle: Press 0
+    Accelerating --> Decelerating: Press ↓
+    Accelerating --> Shutdown: Press ESC
+    
+    CruisingForward --> Decelerating: Press ↓
+    CruisingForward --> Stopping: Press 0
+    CruisingForward --> Shutdown: Press ESC
+    
+    Decelerating --> CruisingReverse: Velocity <= -1.0 m/s
+    Decelerating --> Idle: Press 0
+    Decelerating --> Accelerating: Press ↑
+    Decelerating --> Shutdown: Press ESC
+    
+    CruisingReverse --> Accelerating: Press ↑
+    CruisingReverse --> Stopping: Press 0
+    CruisingReverse --> Shutdown: Press ESC
+    
+    Stopping --> Idle: Velocity = 0
+    Stopping --> Shutdown: Press ESC
+    
+    Shutdown --> SafeStop: Send zero velocity
+    SafeStop --> DisableMotor: Call motor disable service
+    DisableMotor --> [*]: Node exits
+    
+    note right of Initializing
+        - Load parameters
+        - Create /cmd_vel publisher
+        - Setup key input handler
+    end note
+    
+    note right of Accelerating
+        Published cmd_vel:
+        linear.x += accel_step
+        clamped to [current, 1.0]
+    end note
+    
+    note right of Decelerating
+        Published cmd_vel:
+        linear.x -= accel_step
+        clamped to [-1.0, current]
+    end note
+    
+    note right of Stopping
+        Published cmd_vel:
+        linear.x = 0.0
+        Smooth ramp to zero
+    end note
+    
+    note right of SafeStop
+        1. Publish cmd_vel = 0
+        2. Wait for feedback confirmation
+        3. Call /motors/motor_1/disable
+    end note

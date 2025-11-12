@@ -473,6 +473,74 @@ namespace ros2_waveshare {
              * @return Pointer to MotorInstance or nullptr if not found
              */
             const MotorInstance* get_motor(uint8_t node_id) const;
+
+            // =========================================================================
+            // Helper Methods - Action Support
+            // =========================================================================
+
+            /**
+             * @brief Check if action goal should be aborted (cancelled or timeout)
+             * @tparam ActionT Action type
+             * @param goal_handle Goal handle to check
+             * @param start_time Action start time
+             * @param timeout_duration Maximum allowed duration
+             * @param action_name Name for logging
+             * @return true if should abort (sets appropriate result)
+             */
+            template<typename ActionT>
+            bool should_abort_action(
+                const std::shared_ptr<rclcpp_action::ServerGoalHandle<ActionT> >& goal_handle,
+                const rclcpp::Time& start_time,
+                const rclcpp::Duration& timeout_duration,
+                const std::string& action_name);
+
+            /**
+             * @brief Update FSM state and publish to feedback
+             * @tparam FeedbackT Feedback message type
+             * @param motor Motor instance
+             * @param feedback Feedback message to update
+             * @param force_read Force reading statusword from device
+             */
+            template<typename FeedbackT>
+            void update_fsm_feedback(
+                MotorInstance* motor,
+                std::shared_ptr<FeedbackT> feedback,
+                bool force_read = true);
+
+            /**
+             * @brief Execute CIA402 state transition with feedback
+             * @param node_id Motor node ID
+             * @param motor Motor instance
+             * @param feedback Feedback message
+             * @param goal_handle Goal handle for publishing feedback
+             * @param transition_name Human-readable transition name
+             * @param progress_percent Progress percentage (0-100)
+             * @param fsm_function FSM function to execute
+             * @return true if transition successful
+             */
+            template<typename FeedbackT, typename GoalHandleT>
+            bool execute_state_transition(
+                uint8_t node_id,
+                MotorInstance* motor,
+                std::shared_ptr<FeedbackT> feedback,
+                const std::shared_ptr<GoalHandleT>& goal_handle,
+                const std::string& transition_name,
+                float progress_percent,
+                std::function<bool(std::shared_ptr<canopen::CIA402FSM>)> fsm_function);
+
+            /**
+             * @brief Set operation mode via SDO with verification
+             * @param node_id Motor node ID
+             * @param motor Motor instance
+             * @param mode CIA402 mode (1=PP, 3=PV, etc.)
+             * @param error_msg Output error message if failed
+             * @return true if mode set and verified
+             */
+            bool set_operation_mode_verified(
+                uint8_t node_id,
+                MotorInstance* motor,
+                int8_t mode,
+                std::string& error_msg);
     };
 
 }  // namespace ros2_waveshare

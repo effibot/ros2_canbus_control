@@ -67,8 +67,11 @@ include_directories(
 # Collect Source Files Automatically
 # ==============================================================================
 file(GLOB_RECURSE MOTOR_DRIVER_SOURCES
-  "src/motor_*.cpp"
+  "src/*.cpp"
 )
+
+# Exclude lifecycle sources from motor driver sources
+list(FILTER MOTOR_DRIVER_SOURCES EXCLUDE REGEX ".*canopen_lifecycle.*")
 
 file(GLOB LIFECYCLE_SOURCES
   "src/canopen_lifecycle.cpp"
