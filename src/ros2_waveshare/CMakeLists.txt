@@ -31,6 +31,7 @@ find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
+find_package(std_srvs REQUIRED)
 
 # Dependencies list
 set(dependencies
@@ -49,6 +50,7 @@ set(dependencies
   tf2_ros
   tf2_geometry_msgs
   pluginlib
+  std_srvs
 )
 
 # ==============================================================================
@@ -90,6 +92,9 @@ list(FILTER MOTOR_DRIVER_SOURCES EXCLUDE REGEX ".*teleop_velocity.*")
 
 # Exclude odometry node sources from motor driver sources
 list(FILTER MOTOR_DRIVER_SOURCES EXCLUDE REGEX ".*odometry_publisher.*")
+
+# Exclude velocity converter node sources from motor driver sources
+list(FILTER MOTOR_DRIVER_SOURCES EXCLUDE REGEX ".*velocity_converter.*")
 
 # Exclude plugin sources from motor driver sources
 list(FILTER MOTOR_DRIVER_SOURCES EXCLUDE REGEX ".*/plugins/.*")
@@ -201,6 +206,32 @@ ament_target_dependencies(dynamic_models
 pluginlib_export_plugin_description_file(ros2_waveshare dynamic_model_plugins.xml)
 
 # ==============================================================================
+# Velocity Converter Node Executable
+# ==============================================================================
+add_executable(velocity_converter_node
+  src/velocity_converter_node.cpp
+  src/velocity_converter_main.cpp
+)
+
+target_include_directories(velocity_converter_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+target_link_libraries(velocity_converter_node
+  dynamic_models
+)
+
+ament_target_dependencies(velocity_converter_node
+  rclcpp
+  rclcpp_components
+  geometry_msgs
+  pluginlib
+  ros2_waveshare_msgs
+  std_srvs
+)
+
+# ==============================================================================
 # Test Scripts (Optional)
 # ==============================================================================
 # Old test files removed - use lib/waveshare_cpp/scripts/test_canopen_hardware instead
@@ -226,6 +257,7 @@ install(TARGETS
   motor_driver_node
   teleop_velocity_node
   odometry_publisher_node
+  velocity_converter_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

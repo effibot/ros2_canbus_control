@@ -1,0 +1,47 @@
+# Velocity Converter Node Parameters
+# Converts cmd_vel to motor commands using pluggable dynamic models
+
+velocity_converter:
+  ros__parameters:
+    # === Plugin Selection ===
+    # Available plugins:
+    #   - ros2_waveshare::SingleMotorModel (implemented)
+    #   - ros2_waveshare::DifferentialDriveModel (future)
+    #   - ros2_waveshare::AckermannModel (future)
+    plugin_name: "ros2_waveshare::SingleMotorModel"
+    
+    # === Control Loop Configuration ===
+    control_rate: 100.0          # Control loop frequency (Hz)
+    cmd_vel_timeout: 0.5         # Safety timeout for cmd_vel (seconds)
+    
+    # === Motor Configuration ===
+    motor_namespace: "/motors/motor_1"  # Topic namespace for motor communication
+    node_id: 1                          # CANopen node ID (1-127)
+    
+    # === SingleMotorModel Plugin Parameters ===
+    # These parameters are namespaced under 'single_motor_model'
+    # and are loaded by the plugin's initialize() method
+    single_motor_model:
+      # PID Gains
+      kp: 1.0                    # Proportional gain (output/error)
+      ki: 0.1                    # Integral gain (output/(error*time))
+      kd: 0.05                   # Derivative gain (output/(error/time))
+      
+      # Velocity Limits
+      max_velocity: 1.0          # Maximum linear velocity (m/s)
+      max_acceleration: 2.0      # Maximum acceleration (m/s²)
+      
+      # Anti-windup
+      max_integral: 10.0         # Maximum integral term (prevents windup)
+      
+      # Physical Parameters
+      wheel_radius: 0.1          # Wheel radius in meters
+      gear_ratio: 1.0            # Gear reduction ratio (motor:wheel)
+      
+      # Tuning Notes:
+      # - Start with kp only, set ki=0, kd=0
+      # - Increase kp until oscillations appear
+      # - Add ki to eliminate steady-state error
+      # - Add kd to reduce overshoot and dampen oscillations
+      # - Adjust max_integral to prevent integral windup
+      # - max_acceleration limits jerk for smoother motion
