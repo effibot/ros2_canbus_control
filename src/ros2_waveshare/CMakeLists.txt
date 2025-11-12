@@ -26,6 +26,10 @@ find_package(diagnostic_msgs REQUIRED)
 find_package(ros2_waveshare_msgs REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
 # Dependencies list
 set(dependencies
@@ -39,6 +43,10 @@ set(dependencies
   diagnostic_msgs
   ros2_waveshare_msgs
   geometry_msgs
+  nav_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
 )
 
 # ==============================================================================
@@ -77,6 +85,9 @@ list(FILTER MOTOR_DRIVER_SOURCES EXCLUDE REGEX ".*canopen_lifecycle.*")
 
 # Exclude teleop node sources from motor driver sources
 list(FILTER MOTOR_DRIVER_SOURCES EXCLUDE REGEX ".*teleop_velocity.*")
+
+# Exclude odometry node sources from motor driver sources
+list(FILTER MOTOR_DRIVER_SOURCES EXCLUDE REGEX ".*odometry_publisher.*")
 
 file(GLOB LIFECYCLE_SOURCES
   "src/canopen_lifecycle.cpp"
@@ -136,6 +147,29 @@ ament_target_dependencies(teleop_velocity_node
 )
 
 # ==============================================================================
+# Odometry Publisher Node Executable
+# ==============================================================================
+add_executable(odometry_publisher_node
+  src/odometry_publisher_node.cpp
+  src/odometry_publisher_main.cpp
+)
+
+target_include_directories(odometry_publisher_node PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+ament_target_dependencies(odometry_publisher_node
+  rclcpp
+  nav_msgs
+  geometry_msgs
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  ros2_waveshare_msgs
+)
+
+# ==============================================================================
 # Test Scripts (Optional)
 # ==============================================================================
 # Old test files removed - use lib/waveshare_cpp/scripts/test_canopen_hardware instead
@@ -160,6 +194,7 @@ install(TARGETS
   canopen_lifecycle_node
   motor_driver_node
   teleop_velocity_node
+  odometry_publisher_node
   DESTINATION lib/${PROJECT_NAME}
 )
 

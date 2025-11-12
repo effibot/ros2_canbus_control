@@ -1,0 +1,42 @@
+# Odometry Publisher Node Parameters
+# ===================================
+#
+# Integrates encoder feedback from motor to compute odometry
+# For single motor testing, provides 1D motion along x-axis
+#
+# Usage:
+#   ros2 run ros2_waveshare odometry_publisher_node --ros-args --params-file config/odometry_params.yaml
+
+odometry_publisher:
+  ros__parameters:
+    # Motor feedback source
+    # Namespace for motor feedback topic subscription
+    # Node will subscribe to: <motor_namespace>/feedback
+    motor_namespace: "/motors/motor_1"
+
+    # Physical parameters
+    # Wheel radius in meters - used to convert encoder rad to linear distance
+    # distance = encoder_position_rad * wheel_radius
+    wheel_radius: 0.198
+
+    # Publishing rate (Hz)
+    # Frequency at which odometry and TF are published
+    publish_rate: 50.0
+
+    # TF frames
+    # Parent frame for odometry (fixed world frame)
+    odom_frame: "odom"
+
+    # Child frame for robot base (moving with robot)
+    base_frame: "base_link"
+
+    # Whether to publish TF transforms
+    # Set to false if another node is publishing odom -> base_link transform
+    publish_tf: true
+
+    # Initial pose
+    # Starting position and orientation of the robot
+    # For single motor, only x position changes (y and theta remain 0)
+    initial_x: 0.0 # meters
+    initial_y: 0.0 # meters
+    initial_theta: 0.0 # radians
