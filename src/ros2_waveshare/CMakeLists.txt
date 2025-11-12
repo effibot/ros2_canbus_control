@@ -30,6 +30,7 @@ find_package(nav_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
+find_package(pluginlib REQUIRED)
 
 # Dependencies list
 set(dependencies
@@ -47,6 +48,7 @@ set(dependencies
   tf2
   tf2_ros
   tf2_geometry_msgs
+  pluginlib
 )
 
 # ==============================================================================
@@ -88,6 +90,9 @@ list(FILTER MOTOR_DRIVER_SOURCES EXCLUDE REGEX ".*teleop_velocity.*")
 
 # Exclude odometry node sources from motor driver sources
 list(FILTER MOTOR_DRIVER_SOURCES EXCLUDE REGEX ".*odometry_publisher.*")
+
+# Exclude plugin sources from motor driver sources
+list(FILTER MOTOR_DRIVER_SOURCES EXCLUDE REGEX ".*/plugins/.*")
 
 file(GLOB LIFECYCLE_SOURCES
   "src/canopen_lifecycle.cpp"
@@ -170,6 +175,32 @@ ament_target_dependencies(odometry_publisher_node
 )
 
 # ==============================================================================
+# Dynamic Model Plugins Library
+# ==============================================================================
+# Collect all plugin source files
+file(GLOB PLUGIN_SOURCES
+  "src/plugins/*.cpp"
+)
+
+# Build as shared library for pluginlib
+add_library(dynamic_models SHARED ${PLUGIN_SOURCES})
+
+target_include_directories(dynamic_models PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+ament_target_dependencies(dynamic_models
+  rclcpp
+  geometry_msgs
+  pluginlib
+  ros2_waveshare_msgs
+)
+
+# Export plugin library for pluginlib discovery
+pluginlib_export_plugin_description_file(ros2_waveshare dynamic_model_plugins.xml)
+
+# ==============================================================================
 # Test Scripts (Optional)
 # ==============================================================================
 # Old test files removed - use lib/waveshare_cpp/scripts/test_canopen_hardware instead
@@ -198,9 +229,21 @@ install(TARGETS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+# Install plugin library
+install(TARGETS dynamic_models
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
 install(DIRECTORY 
   launch 
   config 
+  DESTINATION share/${PROJECT_NAME}
+)
+
+# Install plugin XML
+install(FILES dynamic_model_plugins.xml
   DESTINATION share/${PROJECT_NAME}
 )
 

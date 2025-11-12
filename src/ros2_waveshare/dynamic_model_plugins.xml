@@ -1,0 +1,85 @@
+<library path="libdynamic_models">
+    <!-- Single Motor Model Plugin -->
+    <class name="ros2_waveshare::SingleMotorModel"
+        type="ros2_waveshare::SingleMotorModel"
+        base_class_type="ros2_waveshare::DynamicModelInterface">
+        <description>
+            Single motor velocity control using PID controller.
+
+            Implements closed-loop velocity control for a single motor by converting
+            linear velocity commands (m/s) to angular motor velocity (rad/s) using
+            wheel radius, then applying PID control based on encoder feedback.
+
+            Features:
+            - PID control with tunable gains (kp, ki, kd)
+            - Anti-windup for integral term
+            - Acceleration limiting for smooth motion
+            - Automatic unit conversion (linear ↔ angular)
+
+            Use Cases:
+            - Testing single motor before integrating into multi-motor systems
+            - Direct wheel control applications
+            - Linear actuators with rotary motors
+
+            Parameters (namespace: single_motor_model):
+            - kp: Proportional gain (default: 1.0)
+            - ki: Integral gain (default: 0.1)
+            - kd: Derivative gain (default: 0.05)
+            - max_velocity: Maximum linear velocity in m/s (default: 1.0)
+            - max_acceleration: Maximum acceleration in m/s² (default: 2.0)
+            - max_integral: Anti-windup limit (default: 10.0)
+            - wheel_radius: Wheel radius in meters (default: 0.1)
+            - gear_ratio: Gear reduction ratio motor:wheel (default: 1.0)
+        </description>
+    </class>
+
+    <!-- Future Plugin: Differential Drive Model -->
+    <class name="ros2_waveshare::DifferentialDriveModel"
+        type="ros2_waveshare::DifferentialDriveModel"
+        base_class_type="ros2_waveshare::DynamicModelInterface">
+        <description>
+            Differential drive kinematics for two-wheel robots.
+
+            Converts Twist commands (linear.x, angular.z) to left/right motor
+            velocities using differential drive kinematics equations.
+
+            Features:
+            - Forward and inverse kinematics
+            - Wheel base and wheel radius configuration
+            - Independent PID control for each wheel
+            - Odometry-based feedback
+
+            Use Cases:
+            - Two-wheeled differential drive robots
+            - Mobile platforms with skid steering
+
+            Status: NOT YET IMPLEMENTED
+        </description>
+    </class>
+
+    <!-- Future Plugin: Ackermann Steering Model -->
+    <class name="ros2_waveshare::AckermannModel"
+        type="ros2_waveshare::AckermannModel"
+        base_class_type="ros2_waveshare::DynamicModelInterface">
+        <description>
+            Ackermann steering geometry for car-like robots.
+
+            Implements Ackermann steering kinematics with separate drive and
+            steering motors. Converts Twist commands to steering angle and
+            drive velocity considering vehicle geometry constraints.
+
+            Features:
+            - Ackermann geometry calculations
+            - Steering angle limits and rate limiting
+            - Center of rotation path planning
+            - Four-wheel vehicle dynamics
+
+            Use Cases:
+            - Car-like robots with front-wheel steering
+            - Autonomous vehicles
+            - Agricultural/industrial vehicles
+
+            Status: NOT YET IMPLEMENTED
+        </description>
+    </class>
+</library>
