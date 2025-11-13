@@ -35,7 +35,7 @@ motor_driver:
         description: "Left traction motor for differential drive"
 
         # CANopen configuration
-        config_file: "config/motor_config.json"
+        config_file: "/home/ros/ws/install/share/ros2_waveshare/config/motor_config.json"
 
         # Mechanical parameters (for unit conversion)
         counts_per_revolution: 10000.0 # Encoder resolution [counts/rev]

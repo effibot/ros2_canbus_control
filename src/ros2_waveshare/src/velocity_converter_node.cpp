@@ -54,12 +54,6 @@ namespace ros2_waveshare {
             throw;
         }
 
-        // Load the plugin
-        if (!load_plugin(plugin_name_)) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to load plugin on startup");
-            throw std::runtime_error("Plugin loading failed");
-        }
-
         // Create subscribers
         cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
             "cmd_vel", 10,
@@ -79,20 +73,42 @@ namespace ros2_waveshare {
             std::bind(&VelocityConverterNode::reload_plugin_callback, this,
             std::placeholders::_1, std::placeholders::_2));
 
-        // Create control timer
-        auto timer_period = std::chrono::duration<double>(1.0 / control_rate_);
-        control_timer_ = this->create_wall_timer(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(timer_period),
-            std::bind(&VelocityConverterNode::control_timer_callback, this));
+        // Create one-shot timer to load plugin after construction completes
+        // This allows shared_from_this() to work properly
+        auto init_timer = this->create_wall_timer(
+            std::chrono::milliseconds(10),
+            [this, loaded = std::make_shared<bool>(false)]() {
+                // Only load once
+                if (*loaded) {
+                    return;
+                }
+                *loaded = true;
 
-        // Initialize time tracking
-        last_cmd_vel_time_ = this->now();
-        last_control_time_ = this->now();
+                // Load the plugin
+                if (!load_plugin(plugin_name_)) {
+                    RCLCPP_ERROR(this->get_logger(), "Failed to load plugin on startup");
+                    rclcpp::shutdown();
+                    return;
+                }
 
-        RCLCPP_INFO(this->get_logger(), "VelocityConverterNode initialized successfully");
-        RCLCPP_INFO(this->get_logger(), "Waiting for cmd_vel and motor feedback...");
+                // Create control timer after plugin is loaded
+                auto timer_period = std::chrono::duration<double>(1.0 / control_rate_);
+                control_timer_ = this->create_wall_timer(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(timer_period),
+                    std::bind(&VelocityConverterNode::control_timer_callback, this));
+
+                // Initialize time tracking
+                last_cmd_vel_time_ = this->now();
+                last_control_time_ = this->now();
+
+                RCLCPP_INFO(this->get_logger(), "VelocityConverterNode initialized successfully");
+                RCLCPP_INFO(this->get_logger(), "Waiting for cmd_vel and motor feedback...");
+            });
+
+        // Store the timer to keep it alive
+        init_timers_.push_back(init_timer);
+        init_timer->reset();
     }
-
     VelocityConverterNode::~VelocityConverterNode() {
         RCLCPP_INFO(this->get_logger(), "VelocityConverterNode shutting down");
         RCLCPP_INFO(this->get_logger(), "Statistics:");

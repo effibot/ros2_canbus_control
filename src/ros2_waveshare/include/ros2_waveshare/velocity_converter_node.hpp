@@ -160,6 +160,7 @@ namespace ros2_waveshare {
             rclcpp::Publisher<ros2_waveshare_msgs::msg::MotorCommand>::SharedPtr motor_cmd_pub_;
             rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reload_plugin_srv_;
             rclcpp::TimerBase::SharedPtr control_timer_;
+            std::vector<rclcpp::TimerBase::SharedPtr> init_timers_; ///< One-shot init timers
 
             // === State Variables ===
             geometry_msgs::msg::Twist::SharedPtr current_cmd_vel_;

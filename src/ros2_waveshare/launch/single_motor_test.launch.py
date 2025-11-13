@@ -108,6 +108,8 @@ def generate_launch_description():
         [pkg_share, 'config', 'odometry_params.yaml'])
     velocity_converter_params = PathJoinSubstitution(
         [pkg_share, 'config', 'velocity_converter_params.yaml'])
+    motor_driver_params = PathJoinSubstitution(
+        [pkg_share, 'config', 'motor_driver_params.yaml'])
 
     # === Node 1: CANopen Lifecycle Node ===
     canopen_lifecycle_node = Node(
@@ -126,12 +128,8 @@ def generate_launch_description():
         package='ros2_waveshare',
         executable='motor_driver_node',
         name='motor_driver',
-        namespace=motor_namespace,
         output='screen',
-        parameters=[{
-            'node_id': node_id,
-            'can_interface': can_interface,
-        }],
+        parameters=[motor_driver_params],
         remappings=[],
     )
 
@@ -159,7 +157,6 @@ def generate_launch_description():
                 'plugin_name': plugin_name,
                 'motor_namespace': motor_namespace,
                 'node_id': node_id,
-                'single_motor_model.wheel_radius': wheel_radius,
             }
         ],
         remappings=[],
